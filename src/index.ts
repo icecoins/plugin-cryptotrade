@@ -20,17 +20,18 @@ import {
 } from '@elizaos/core';
 
 import { z } from 'zod';
-import {getNewsData} from "./actions/action_get_news_data.ts";
-import {getOnChainData} from "./actions/action_get_on_chain_data.ts";
-import {processNewsData} from "./actions/action_process_news.ts";
-import {processPriceData} from "./actions/action_process_price.ts";
-import {reply} from "./actions/action_reply_1.ts" ;
-import { ApiService } from './services/apiService.ts';
+import { getNewsData } from "./actions/ActionGetNewsData.ts";
+import { getOnChainData } from "./actions/ActionGetOnChainData.ts";
+import { processNewsData } from "./actions/ActionProcessNews.ts";
+import { processPriceData } from "./actions/ActionProcessPrice.ts";
+import { reply } from "./actions/ActionReply.ts" ;
+import { ApiService } from './services/ApiService.ts';
 import { ActionEventPayload, composePromptFromState, EventType, messageHandlerTemplate, 
   MessagePayload, MessageReceivedHandlerParams, PluginEvents } from '@elizaos/core';
 
 
 import { v4 } from 'uuid';
+import { makeTrade } from './actions/ActionMakeTrade.ts';
 // import {getOnChainData} from "./actions/action_get_on_chain_data" ;
 /**
  * Defines the configuration schema for a plugin, including the validation rules for the plugin name.
@@ -178,6 +179,29 @@ const managerMsgHandler = async ({
   callback,
   onComplete,
 }: MessageReceivedHandlerParams): Promise<void> => {
+  let _state = await runtime.composeState(message);
+  const _responseContent = {
+      thought: '',
+      actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
+      text: ''
+    };
+  const _responseMessage = {
+        id: asUUID(v4()),
+        entityId: runtime.agentId,
+        agentId: runtime.agentId,
+        content: _responseContent,
+        roomId: message.roomId,
+        createdAt: Date.now(),
+      };
+  if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
+    _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
+    logger.warn('[Manager Handler] callback');
+    await callback(_responseContent);
+  } else {
+    logger.warn('[Manager Handler] processActions');
+    await runtime.processActions(message, [_responseMessage], _state, callback);
+  }
+  // return;
   const manageTemplate_Intro = `
   # You are a professional cryptoCurrency trader. If you received message from user, you should start you actions immediately. You are supposed to make a trade by executing actions in the following steps: 1."GET_PRICE" and "GET_NEWS" (these two actions should be take together, not single); 2."PROCESS_PRICE" and "PROCESS_NEW " (these two actions should be take together, not single); 3."MAKE_TRADE"; 4."REPLY".\n\n
   # Task: Generate dialog with actions.
@@ -240,13 +264,13 @@ const managerMsgHandler = async ({
   let state = await runtime.composeState(message);
   var apiService = runtime.getService(ApiService.serviceType) as ApiService;
   var userMsgTmp = '';
-  var prompt;
+  var prompt = '';
   // Message from CryptoTrade Actions, take next actions
   if(message && message.content && message.content.text.startsWith('CryptoTrade_Action')){
     prompt = composePromptFromState({
         state,
         template: manageTemplate_Intro + manageTemplate_Example + 
-        manageTemplate_Rules + manageTemplate_state + apiService.get_state() + 
+        manageTemplate_Rules + manageTemplate_state + apiService.getState() + 
         '\n\n' + manageTemplate_take_actions
     });
   }else{
@@ -257,7 +281,7 @@ const managerMsgHandler = async ({
     prompt = composePromptFromState({
         state,
         template: manageTemplate_Intro + manageTemplate_Example + 
-        manageTemplate_Rules + manageTemplate_state + apiService.get_state() + 
+        manageTemplate_Rules + manageTemplate_state + apiService.getState() + 
         '\n\n' + userMsgTmp + manageTemplate_format
     });
   }
@@ -394,14 +418,14 @@ var events:PluginEvents = {
   [EventType.MESSAGE_SENT]: [
     async (payload: MessagePayload) => {
       logger.warn(`[CryptoTrader] Message sent: ${payload.message}`);
-      if(payload.source && payload.source.startsWith('CryptoTrade_Action')){
-        await managerMsgHandler({
-          runtime: payload.runtime,
-          message: payload.message,
-          callback: payload.callback,
-          onComplete: payload.onComplete,
-        });
-      }
+      // if(payload.source && payload.source.startsWith('CryptoTrade_Action')){
+      //   await managerMsgHandler({
+      //     runtime: payload.runtime,
+      //     message: payload.message,
+      //     callback: payload.callback,
+      //     onComplete: payload.onComplete,
+      //   });
+      // }
     },
   ],
 
@@ -488,7 +512,7 @@ export const starterPlugin: Plugin = {
   ],
   services: [StarterService, ApiService],
   actions: [helloWorldAction, reply, getNewsData, 
-    getOnChainData, processNewsData, processPriceData],
+    getOnChainData, processNewsData, processPriceData, makeTrade],
   providers: [helloWorldProvider],
   events:events
 };

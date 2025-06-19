@@ -13,13 +13,13 @@ import {
 } from "@elizaos/core";
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
-import { ApiService } from "src/services/apiService";
-export const processNewsData: Action = {
-    name: "PROCESS_REFLECT",
+import { ApiService } from "src/services/ApiService";
+export const makeTrade: Action = {
+    name: "MAKE_TRADE",
     similes: [
-        "ANALYZE_REFLECT"
+        "MAKE_DECISION"
     ],
-    description: "Analyze records and reflect to make a cryptocurrency trade",
+    description: "Make a cryptocurrency trade",
     validate: async (runtime: IAgentRuntime, message: MessageMemory, state: State) => {
         // return (state['stage'] && state['stage']=='GET_DATA');
         return true;
@@ -47,12 +47,11 @@ export const processNewsData: Action = {
             // }
             const service = runtime.getService(ApiService.serviceType) as ApiService;
             // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            const resp = 'Reflect: In last stage, I decided to sell part of BTC. Accuracy of my decision is 80%.';
-            service.data['REFLECT'] = resp;
+            const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
             if(callback){
                 callback({
                     text:`
-                    Here is the reflect of records: 
+                    Here is the analysis of on-chain data: 
                     
                     ${resp}
                     `
@@ -66,20 +65,21 @@ export const processNewsData: Action = {
                 // });
                 // state['stage']='NOTIFY_MANAGER';
                 
-                service.state['PROCESS_REFLET'] = 'DONE';
+                service.state['MAKE_TRADE'] = 'DONE';
+                service.data['TRADE'] = resp;
                 var message: Memory;
-                message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
+                message.content.text = 'CryptoTrade_Action_MAKE_TRADE DONE';
                 message.id = asUUID(v4());
-                runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_REFLET'});
-                logger.warn('***** ACTION PROCESS_REFLET DONE *****')
+                runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_MAKE_TRADE'});
+                logger.warn('***** ACTION MAKE_TRADE DONE *****')
                 return true;
             }
         } catch (error) {
-            elizaLogger.error("Error in reflect action:", error);
+            elizaLogger.error("Error in MAKE_TRADE:", error);
             if(callback){
                 callback({
                     text:`
-                    Error in reflect:
+                    Error in news analyze:
                     
                     ${error.message}
                     `
@@ -90,6 +90,6 @@ export const processNewsData: Action = {
         }
     },
     examples: [
-    ] as ActionExample[][],
+    ],
 } as Action;
 

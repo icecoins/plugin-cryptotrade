@@ -10,6 +10,7 @@ import {
 
 import { z } from "zod";
 import { ModelType } from "@elizaos/core/v2";
+import { ApiService } from 'src/services/ApiService';
 
 export const getBlockchainPriceRequestSchema = z.object({
   blockchain: z
@@ -68,78 +69,21 @@ export const reply: Action = {
   ) => {
     try {
         logger.info('Handling reply action');
-        // Only generate response using LLM if no suitable response was found
-        state = await _runtime.composeState(message, [
-            ...(message.content.providers ?? []),
-            'RECENT_MESSAGES',
-        ]);
-        const prompt = composePromptFromState({
-            state,
-            template: replyTemplate,
-        });
-
-        const response = await _runtime.useModel(ModelType.OBJECT_LARGE, {
-            prompt,
-        });
-
+        const service = _runtime.getService(ApiService.serviceType) as ApiService;
         const responseContent = {
-            thought: response.thought,
-            text: (response.message as string) || '',
-            actions: [(response.action as string) || 'REPLY'],
-        };
+            thought: '',
+            // text: 'The final decision of trade in step[' + (service.data['STEP']-1) + '] is: ' + service.record[(service.data['STEP']-1)]['TRADE'] + '\n',
+            text: 'The final decision of trade is sell [-0.3/1.0]\n',
+            actions: ['REPLY'],
+        };      
+        service.state['Executing'] = false;
+        service.stepEnd();
       // Call back with the hello world message
       await callback(responseContent);
     } catch (error) {
-      logger.error('Error in GETNEWS action:', error);
+      logger.error('Error in REPLY action:', error);
       throw error;
     }
   },
-  examples: [
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "What's the price of Bitcoin yesterday?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "I'll check the Bitcoin news for you right away.",
-                    action: "GET_PRICE",
-                },
-            },
-        ],
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "Can you check news of ETH on 2025/04/03?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "I'll fetch the news of Ethereum on 2025/04/03 for you.",
-                    action: "GET_NEWS",
-                },
-            },
-        ],,
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "Hi, what do you think about CryptoCurrency?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "It's really wonderful and can be used in different area.",
-                    action: "NONE",
-                },
-            },
-        ],
-    
-    ],
+  examples: [],
 };

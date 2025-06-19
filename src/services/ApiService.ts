@@ -58,8 +58,8 @@ export class ApiService extends Service {
   static async start(runtime: IAgentRuntime) {
     logger.info(`*** Starting api service - MODIFIED: ${new Date().toISOString()} ***`);
     const service = new ApiService(runtime);
-    service.init_state();
-    service.init_data();
+    service.initState();
+    service.initData();
     return service;
   }
 
@@ -99,7 +99,7 @@ export class ApiService extends Service {
   public state:{} = {Executing:false, GET_PRICE:'UNDONE'};
   public data:{} = {STEP:0, STAGE:0};
   public record:{} = {};
-  init_state() {
+  initState() {
     this.state['Executing'] = false;
     this.state['GET_PRICE'] = 'UNDONE';
     this.state['GET_NEWS'] = 'UNDONE';
@@ -108,7 +108,7 @@ export class ApiService extends Service {
     this.state['PROCESS_REFLET'] = 'UNDONE';
     this.state['MAKE_TRADE'] = 'UNDONE';
   }
-  init_data() {
+  initData() {
     this.data['STEP'] = this.data['STEP'] + 1;
     this.data['STAGE'] = 0;
     this.data['PRICE'] = '';
@@ -116,14 +116,15 @@ export class ApiService extends Service {
     this.data['ANALYSIS_PRICE'] = '';
     this.data['ANALYSIS_NEWS'] = '';
     this.data['REFLECT'] = '';
+    this.data['TRADE'] = '';
   }
-  public step_end(){
+  public stepEnd(){
     this.record[data['STEP']] = {data: this.data, state: this.state};
     logger.error('STEP END, RECORD:\n', JSON.stringify(this.record[data['STEP']]))
-    this.init_data();
-    this.init_state();
+    this.initData();
+    this.initState();
   }
-  public update_state(Executing: boolean, GET_PRICE: string, GET_NEWS: string, 
+  public updateState(Executing: boolean, GET_PRICE: string, GET_NEWS: string, 
     PROCESS_PRICE: string, PROCESS_NEWS: string, PROCESS_REFLET: string, MAKE_TRADE: string) {
     this.state['Executing'] = Executing;
     this.state['GET_PRICE'] = GET_PRICE;
@@ -133,15 +134,7 @@ export class ApiService extends Service {
     this.state['PROCESS_REFLET'] = PROCESS_REFLET;
     this.state['MAKE_TRADE'] = MAKE_TRADE;
   }
-  public get_state() {
-    // return[
-    //   this.state['Executing'],
-    //   this.state['GET_PRICE'],
-    //   this.state['GET_NEWS'],
-    //   this.state['PROCESS_PRICE'],
-    //   this.state['PROCESS_NEWS'],
-    //   this.state['MAKE_TRADE']
-    // ]
+  public getState() {
     return JSON.stringify({
       Executing :this.state['Executing'],
       GET_PRICE :this.state['GET_PRICE'],

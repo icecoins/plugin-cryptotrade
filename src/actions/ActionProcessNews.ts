@@ -13,13 +13,13 @@ import {
 } from "@elizaos/core";
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
-import { ApiService } from "src/services/apiService";
-export const makeTrade: Action = {
-    name: "MAKE_TRADE",
+import { ApiService } from "src/services/ApiService";
+export const processNewsData: Action = {
+    name: "PROCESS_NEWS",
     similes: [
-        "MAKE_DECISION"
+        "ANALYZE_NEWS"
     ],
-    description: "Make a cryptocurrency trade",
+    description: "Analyze news and make a cryptocurrency trade",
     validate: async (runtime: IAgentRuntime, message: MessageMemory, state: State) => {
         // return (state['stage'] && state['stage']=='GET_DATA');
         return true;
@@ -47,36 +47,26 @@ export const makeTrade: Action = {
             // }
             const service = runtime.getService(ApiService.serviceType) as ApiService;
             // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
+            const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
             if(callback){
                 callback({
                     text:`
-                    Here is the analysis of on-chain data: 
+                    Here is the analysis of off-chain news: 
                     
                     ${resp}
                     `
                 });
-                        
-                // await runtime.emitEvent(CRYPTO_EventType.CRYPTO_NOTIFY_ACTION_END, {
-                //     runtime,
-                //     entityId: runtime.agentId,
-                //     status: 'CRYPTO_NOTIFY_ACTION_END',
-                //     source: runtime.character.name,
-                // });
-                // state['stage']='NOTIFY_MANAGER';
-                
-                service.state['MAKE_TRADE'] = 'DONE';
-                service.state['Executing'] = false;
-                service.step_end();
-                var message: Memory;
-                message.content.text = 'CryptoTrade_Action_MAKE_TRADE DONE';
-                message.id = asUUID(v4());
-                runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_MAKE_TRADE'});
-                logger.warn('***** ACTION MAKE_TRADE DONE *****')
-                return true;
             }
+            service.data['ANALYSIS_NEWS'] = resp;
+            service.state['PROCESS_NEWS'] = 'DONE';
+            var message: Memory;
+            message.content.text = 'CryptoTrade_Action_PROCESS_NEWS DONE';
+            message.id = asUUID(v4());
+            runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_NEWS'});
+            logger.warn('***** ACTION PROCESS_NEWS DONE *****')
+            return true;
         } catch (error) {
-            elizaLogger.error("Error in MAKE_TRADE:", error);
+            elizaLogger.error("Error in news analyse:", error);
             if(callback){
                 callback({
                     text:`
@@ -91,6 +81,6 @@ export const makeTrade: Action = {
         }
     },
     examples: [
-    ],
+    ] as ActionExample[][],
 } as Action;
 

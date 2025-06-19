@@ -13,7 +13,7 @@ import {
     asUUID,
 } from "@elizaos/core";
 
-import { ApiService } from "src/services/apiService";
+import { ApiService } from "src/services/ApiService";
 
 import { z } from "zod";
 
@@ -69,7 +69,9 @@ export const getOnChainData: Action = {
     ): Promise<unknown> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
-            // const resp = await service.postOnChianAPI(data.blockchain, data.date);
+            /*
+            const resp = await service.postOnChianAPI(data.blockchain, data.date);
+            */
             const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
             service.data['PRICE'] = resp;
             if(callback){
