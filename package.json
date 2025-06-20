@@ -1,7 +1,7 @@
 {
   "name": "@icecoins/plugin-cryptotrade",
   "description": "Plugin-cryptotrade plugin for ElizaOS",
-  "version": "0.1.8",
+  "version": "0.1.12",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",

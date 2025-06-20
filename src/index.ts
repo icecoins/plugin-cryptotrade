@@ -19,7 +19,7 @@ import {
   MemoryType,
 } from '@elizaos/core';
 
-import { z } from 'zod';
+import { BRAND, z } from 'zod';
 import { getNewsData } from "./actions/ActionGetNewsData.ts";
 import { getOnChainData } from "./actions/ActionGetOnChainData.ts";
 import { processNewsData } from "./actions/ActionProcessNews.ts";
@@ -32,6 +32,11 @@ import { ActionEventPayload, composePromptFromState, EventType, messageHandlerTe
 
 import { v4 } from 'uuid';
 import { makeTrade } from './actions/ActionMakeTrade.ts';
+import { manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules, 
+  manageTemplate_state, manageTemplate_take_actions, manageTemplate_format, 
+  LLM_produce_actions,
+  LLM_retry_times,
+  tryToCallLLM} from './const/Const.ts';
 // import {getOnChainData} from "./actions/action_get_on_chain_data" ;
 /**
  * Defines the configuration schema for a plugin, including the validation rules for the plugin name.
@@ -180,79 +185,32 @@ const managerMsgHandler = async ({
   onComplete,
 }: MessageReceivedHandlerParams): Promise<void> => {
   let _state = await runtime.composeState(message);
-  const _responseContent = {
-      thought: '',
-      actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
-      text: ''
-    };
-  const _responseMessage = {
-        id: asUUID(v4()),
-        entityId: runtime.agentId,
-        agentId: runtime.agentId,
-        content: _responseContent,
-        roomId: message.roomId,
-        createdAt: Date.now(),
+  if(LLM_produce_actions){
+    const _responseContent = {
+        thought: '',
+        actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
+        text: ''
       };
-  if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
-    _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
-    logger.warn('[Manager Handler] callback');
-    await callback(_responseContent);
-  } else {
-    logger.warn('[Manager Handler] processActions');
-    await runtime.processActions(message, [_responseMessage], _state, callback);
+    const _responseMessage = {
+          id: asUUID(v4()),
+          entityId: runtime.agentId,
+          agentId: runtime.agentId,
+          content: _responseContent,
+          roomId: message.roomId,
+          createdAt: Date.now(),
+        };
+    if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
+      _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
+      logger.warn('[Manager Handler] callback');
+      await callback(_responseContent);
+    } else {
+      logger.warn('[Manager Handler] processActions');
+      await runtime.processActions(message, [_responseMessage], _state, callback);
+    }
+    
+    return;
   }
-  // return;
-  const manageTemplate_Intro = `
-  # You are a professional cryptoCurrency trader. If you received message from user, you should start you actions immediately. You are supposed to make a trade by executing actions in the following steps: 1."GET_PRICE" and "GET_NEWS" (these two actions should be take together, not single); 2."PROCESS_PRICE" and "PROCESS_NEW " (these two actions should be take together, not single); 3."MAKE_TRADE"; 4."REPLY".\n\n
-  # Task: Generate dialog with actions.
-  # Instructions: Write the next message for user.
-  "thought" should be a short description of what the agent is thinking about and planning.
-  "message" should be the next message for user which they will send to the conversation.
-  "actions" should be the next actions that agent will conduct, "actions" should include one or more actions. 
-  # Possible response actions: "GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY", "IGNORE"\n\n
-  `;
-  const manageTemplate_Example = `
-  # Action Examples:
-  user: Please help me to make a decision of BTC trade, am I supposed to buy or sell?\nagent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")\n\n
-  agent: I've got the price and news of BTC, analysing. (actions: "PROCESS_PRICE", "PROCESS_NEWS")\n\n
-  agent: Analysis done, the price of BTC seems to be going down, we should sell part of them, about 20%. (actions: "MAKE_TRADE")\n\n
-  agent: Finally, reply the decision to user. The decision is: -0.2/1.0 of your BTC. (actions: "REPLY")
-  `;
-  const manageTemplate_Rules = `
-  # RULES:
-  RULE 1: User is asking the proposal to make a cryptoCurrency trade, you should begin to make a trade by executing actions in the following order above, and reply in the end;\n
-  RULE 2: When your are executing ations, they must be executed strictly in the order of steps;\n
-  RULE 3: You should decide next actions with the state of the steps'execution provided below, after actions in step before has been "DONE", execute actions in the next step;\n
-  RULE 4: User is talking about other things, or your are executing actions (eg: In step 2, "PROCESS_PRICE" done, but still waiting "PROCESS_NEWS"), set "actions" as "IGNORE".\n
-  RULE 5: The response must contain "thought", "message", and "actions".\n\n
-  `;
-  const manageTemplate_state = `
-  The state of the steps'execution:
-  `;
-  const manageTemplate_format = `
-  # Response format
-  # Response format should be formatted in a valid JSON block like this:
-
-  {
-      "thought": "<string>",
-      "message": "<string>",
-      "actions": ["<string>", "<string>", "<string>"]
-  }
-
-  # Your response should include the valid JSON block and nothing else.
-  # Response format end
-  `;
-  const manageTemplate_take_actions = `
-  # Choose your next actions within the [Possible response action] and the [RULES] mentioned before.
-  # Your response should be formatted in a valid JSON block like this:
-
-  {
-      "thought": "<string>",
-      "message": "<string>",
-      "actions": ["<string>", "<string>", "<string>"]
-  }
-  # Now, choose your next actions:
-  `;
+  
   // First, save the incoming message
   logger.warn('[Manager Handler] Saving message to memory and embeddings');
   if(message && message.content && message.content.text){
@@ -285,18 +243,18 @@ const managerMsgHandler = async ({
         '\n\n' + userMsgTmp + manageTemplate_format
     });
   }
-
-  logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
-  const response = await runtime.useModel(ModelType.TEXT_LARGE, {
-    prompt: prompt,
-  });
-
-  // Attempt to parse the XML response
-  logger.warn('[CryptoTrader] *** response ***\n', response);
-  // const parsedXml = parseKeyValueXml(response);
-  // const parsedJson = parseJSONObjectFromText(response);
-  const parsedJson = JSON.parse(response);
-  // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
+  
+  const parsedJson = await tryToCallLLM(prompt, runtime);
+  // const parsedJson = JSON.parse('response');
+  if(!parsedJson){
+    let responseContent = {
+      thought: 'LLM error',
+      actions: ['IGNORE'],
+      text: 'Can not parse data from LLM after retry [' + LLM_retry_times + '] times',
+    };
+    await callback(responseContent);
+    return;
+  }
 
   let responseContent: Content | null = null;
   let responseMessages: Memory[] = [];

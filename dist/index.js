@@ -1,14 +1,14 @@
 // src/index.ts
 import {
-  ModelType as ModelType2,
+  ModelType,
   Service as Service2,
-  logger as logger7,
+  logger as logger8,
   createUniqueUuid,
-  asUUID as asUUID5
+  asUUID as asUUID6
 } from "@elizaos/core";
 import { z as z3 } from "zod";
 
-// src/actions/action_get_news_data.ts
+// src/actions/ActionGetNewsData.ts
 import {
   elizaLogger,
   EventType,
@@ -61,7 +61,7 @@ function v4(options, buf, offset) {
 }
 var v4_default = v4;
 
-// src/services/apiService.ts
+// src/services/ApiService.ts
 import {
   logger,
   Service
@@ -100,8 +100,8 @@ var ApiService = class _ApiService extends Service {
   static async start(runtime) {
     logger.info(`*** Starting api service - MODIFIED: ${(/* @__PURE__ */ new Date()).toISOString()} ***`);
     const service = new _ApiService(runtime);
-    service.init_state();
-    service.init_data();
+    service.initState();
+    service.initData();
     return service;
   }
   static async stop(runtime) {
@@ -136,7 +136,7 @@ var ApiService = class _ApiService extends Service {
   state = { Executing: false, GET_PRICE: "UNDONE" };
   data = { STEP: 0, STAGE: 0 };
   record = {};
-  init_state() {
+  initState() {
     this.state["Executing"] = false;
     this.state["GET_PRICE"] = "UNDONE";
     this.state["GET_NEWS"] = "UNDONE";
@@ -145,7 +145,7 @@ var ApiService = class _ApiService extends Service {
     this.state["PROCESS_REFLET"] = "UNDONE";
     this.state["MAKE_TRADE"] = "UNDONE";
   }
-  init_data() {
+  initData() {
     this.data["STEP"] = this.data["STEP"] + 1;
     this.data["STAGE"] = 0;
     this.data["PRICE"] = "";
@@ -153,14 +153,15 @@ var ApiService = class _ApiService extends Service {
     this.data["ANALYSIS_PRICE"] = "";
     this.data["ANALYSIS_NEWS"] = "";
     this.data["REFLECT"] = "";
+    this.data["TRADE"] = "";
   }
-  step_end() {
+  stepEnd() {
     this.record[data["STEP"]] = { data: this.data, state: this.state };
     logger.error("STEP END, RECORD:\n", JSON.stringify(this.record[data["STEP"]]));
-    this.init_data();
-    this.init_state();
+    this.initData();
+    this.initState();
   }
-  update_state(Executing, GET_PRICE, GET_NEWS, PROCESS_PRICE, PROCESS_NEWS, PROCESS_REFLET, MAKE_TRADE) {
+  updateState(Executing, GET_PRICE, GET_NEWS, PROCESS_PRICE, PROCESS_NEWS, PROCESS_REFLET, MAKE_TRADE) {
     this.state["Executing"] = Executing;
     this.state["GET_PRICE"] = GET_PRICE;
     this.state["GET_NEWS"] = GET_NEWS;
@@ -169,7 +170,7 @@ var ApiService = class _ApiService extends Service {
     this.state["PROCESS_REFLET"] = PROCESS_REFLET;
     this.state["MAKE_TRADE"] = MAKE_TRADE;
   }
-  get_state() {
+  getState() {
     return JSON.stringify({
       Executing: this.state["Executing"],
       GET_PRICE: this.state["GET_PRICE"],
@@ -182,7 +183,7 @@ var ApiService = class _ApiService extends Service {
   }
 };
 
-// src/actions/action_get_news_data.ts
+// src/actions/ActionGetNewsData.ts
 var getNewsData = {
   name: "GET_NEWS",
   similes: [
@@ -278,7 +279,7 @@ var getNewsData = {
   ]
 };
 
-// src/actions/action_get_on_chain_data.ts
+// src/actions/ActionGetOnChainData.ts
 import {
   elizaLogger as elizaLogger2,
   EventType as EventType2,
@@ -398,7 +399,7 @@ var getOnChainData = {
   ]
 };
 
-// src/actions/action_process_news.ts
+// src/actions/ActionProcessNews.ts
 import {
   elizaLogger as elizaLogger3,
   EventType as EventType3,
@@ -418,7 +419,6 @@ var processNewsData = {
     try {
       const service = runtime.getService(ApiService.serviceType);
       const resp = "Analysis done, the news shows that the price of the cryptocurrency will go down.";
-      service.data["ANALYSIS_NEWS"] = resp;
       if (callback) {
         callback({
           text: `
@@ -427,14 +427,15 @@ var processNewsData = {
                     ${resp}
                     `
         });
-        service.state["PROCESS_NEWS"] = "DONE";
-        var message;
-        message.content.text = "CryptoTrade_Action_PROCESS_NEWS DONE";
-        message.id = asUUID3(v4_default());
-        runtime.emitEvent(EventType3.MESSAGE_SENT, { runtime, message, source: "CryptoTrade_Action_PROCESS_NEWS" });
-        logger4.warn("***** ACTION PROCESS_NEWS DONE *****");
-        return true;
       }
+      service.data["ANALYSIS_NEWS"] = resp;
+      service.state["PROCESS_NEWS"] = "DONE";
+      var message;
+      message.content.text = "CryptoTrade_Action_PROCESS_NEWS DONE";
+      message.id = asUUID3(v4_default());
+      runtime.emitEvent(EventType3.MESSAGE_SENT, { runtime, message, source: "CryptoTrade_Action_PROCESS_NEWS" });
+      logger4.warn("***** ACTION PROCESS_NEWS DONE *****");
+      return true;
     } catch (error) {
       elizaLogger3.error("Error in news analyse:", error);
       if (callback) {
@@ -453,7 +454,7 @@ var processNewsData = {
   examples: []
 };
 
-// src/actions/action_process_price.ts
+// src/actions/ActionProcessPrice.ts
 import {
   elizaLogger as elizaLogger4,
   EventType as EventType4,
@@ -473,7 +474,6 @@ var processPriceData = {
     try {
       const service = runtime.getService(ApiService.serviceType);
       const resp = "Analysis done, it seems that the price will go down.";
-      service.data["ANALYSIS_PRICE"] = resp;
       if (callback) {
         callback({
           text: `
@@ -482,14 +482,15 @@ var processPriceData = {
                     ${resp}
                     `
         });
-        service.state["PROCESS_PRICE"] = "DONE";
-        var message;
-        message.content.text = "CryptoTrade_Action_PROCESS_PRICE DONE";
-        message.id = asUUID4(v4_default());
-        runtime.emitEvent(EventType4.MESSAGE_SENT, { runtime, message, source: "CryptoTrade_Action_PROCESS_PRICE" });
-        logger5.warn("***** ACTION PROCESS_PRICE DONE *****");
-        return true;
       }
+      service.data["ANALYSIS_PRICE"] = resp;
+      service.state["PROCESS_PRICE"] = "DONE";
+      var message;
+      message.content.text = "CryptoTrade_Action_PROCESS_PRICE DONE";
+      message.id = asUUID4(v4_default());
+      runtime.emitEvent(EventType4.MESSAGE_SENT, { runtime, message, source: "CryptoTrade_Action_PROCESS_PRICE" });
+      logger5.warn("***** ACTION PROCESS_PRICE DONE *****");
+      return true;
     } catch (error) {
       elizaLogger4.error("Error in price analyse:", error);
       if (callback) {
@@ -508,13 +509,11 @@ var processPriceData = {
   examples: []
 };
 
-// src/actions/action_reply_1.ts
+// src/actions/ActionReply.ts
 import {
-  logger as logger6,
-  composePromptFromState
+  logger as logger6
 } from "@elizaos/core";
 import { z as z2 } from "zod";
-import { ModelType } from "@elizaos/core/v2";
 var getBlockchainPriceRequestSchema2 = z2.object({
   blockchain: z2.nativeEnum({ BTC: "btc", SOL: "sol", ETH: "eth" }).describe("The blockchain to get statistics for"),
   date: z2.string().optional().describe("The date to request (optional)")
@@ -523,25 +522,6 @@ var getBlockchainPriceRequestSchema2 = z2.object({
   //     .optional()
   //     .describe("End timestamp for the transfers (optional)"),
 });
-var replyTemplate = `# Task: Generate dialog for user.
-# Instructions: Write the next message for user.
-"thought" should be a short description of what the agent is thinking about and planning.
-"message" should be the next message for user which they will send to the conversation.
-"action" should be the next action that agent will conduct. 
-RULE 1: User is asking the price of BTC, then the "action" will be GET_PRICE; 
-RULE 2: User wants to know news of ETH, the "action" in reply should be "GET_NEWS"; 
-RULE 3: User is talking about other things, set "action" as "NONE".
-
-Response format should be formatted in a valid JSON block like this:
-\`\`\`json
-{
-    "thought": "<string>",
-    "message": "<string>",
-    "action": "<string>",
-}
-\`\`\`
-
-Your response should include the valid JSON block and nothing else.`;
 var reply = {
   name: "REPLY",
   similes: [
@@ -556,88 +536,91 @@ var reply = {
   handler: async (_runtime, message, state, _options, callback, _responses) => {
     try {
       logger6.info("Handling reply action");
-      state = await _runtime.composeState(message, [
-        ...message.content.providers ?? [],
-        "RECENT_MESSAGES"
-      ]);
-      const prompt = composePromptFromState({
-        state,
-        template: replyTemplate
-      });
-      const response = await _runtime.useModel(ModelType.OBJECT_LARGE, {
-        prompt
-      });
+      const service = _runtime.getService(ApiService.serviceType);
       const responseContent = {
-        thought: response.thought,
-        text: response.message || "",
-        actions: [response.action || "REPLY"]
+        thought: "",
+        // text: 'The final decision of trade in step[' + (service.data['STEP']-1) + '] is: ' + service.record[(service.data['STEP']-1)]['TRADE'] + '\n',
+        text: "The final decision of trade is sell [-0.3/1.0]\n",
+        actions: ["REPLY"]
       };
+      service.state["Executing"] = false;
+      service.stepEnd();
       await callback(responseContent);
     } catch (error) {
-      logger6.error("Error in GETNEWS action:", error);
+      logger6.error("Error in REPLY action:", error);
       throw error;
     }
   },
-  examples: [
-    [
-      {
-        name: "{{user1}}",
-        content: {
-          text: "What's the price of Bitcoin yesterday?"
-        }
-      },
-      {
-        name: "{{agent}}",
-        content: {
-          text: "I'll check the Bitcoin news for you right away.",
-          action: "GET_PRICE"
-        }
-      }
-    ],
-    [
-      {
-        name: "{{user1}}",
-        content: {
-          text: "Can you check news of ETH on 2025/04/03?"
-        }
-      },
-      {
-        name: "{{agent}}",
-        content: {
-          text: "I'll fetch the news of Ethereum on 2025/04/03 for you.",
-          action: "GET_NEWS"
-        }
-      }
-    ],
-    ,
-    [
-      {
-        name: "{{user1}}",
-        content: {
-          text: "Hi, what do you think about CryptoCurrency?"
-        }
-      },
-      {
-        name: "{{agent}}",
-        content: {
-          text: "It's really wonderful and can be used in different area.",
-          action: "NONE"
-        }
-      }
-    ]
-  ]
+  examples: []
 };
 
 // src/index.ts
 import {
   composePromptFromState as composePromptFromState2,
-  EventType as EventType5,
+  EventType as EventType6,
   messageHandlerTemplate
 } from "@elizaos/core";
+
+// src/actions/ActionMakeTrade.ts
+import {
+  elizaLogger as elizaLogger5,
+  EventType as EventType5,
+  logger as logger7,
+  asUUID as asUUID5
+} from "@elizaos/core";
+var makeTrade = {
+  name: "MAKE_TRADE",
+  similes: [
+    "MAKE_DECISION"
+  ],
+  description: "Make a cryptocurrency trade",
+  validate: async (runtime, message, state) => {
+    return true;
+  },
+  handler: async (runtime, message, state, _options, callback, _responses) => {
+    try {
+      const service = runtime.getService(ApiService.serviceType);
+      const resp = "After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0";
+      if (callback) {
+        callback({
+          text: `
+                    Here is the analysis of on-chain data: 
+                    
+                    ${resp}
+                    `
+        });
+        service.state["MAKE_TRADE"] = "DONE";
+        service.data["TRADE"] = resp;
+        var message;
+        message.content.text = "CryptoTrade_Action_MAKE_TRADE DONE";
+        message.id = asUUID5(v4_default());
+        runtime.emitEvent(EventType5.MESSAGE_SENT, { runtime, message, source: "CryptoTrade_Action_MAKE_TRADE" });
+        logger7.warn("***** ACTION MAKE_TRADE DONE *****");
+        return true;
+      }
+    } catch (error) {
+      elizaLogger5.error("Error in MAKE_TRADE:", error);
+      if (callback) {
+        callback({
+          text: `
+                    Error in news analyze:
+                    
+                    ${error.message}
+                    `
+        });
+        return false;
+      }
+      return false;
+    }
+  },
+  examples: []
+};
+
+// src/index.ts
 var configSchema = z3.object({
   EXAMPLE_PLUGIN_VARIABLE: z3.string().min(1, "Example plugin variable is not provided").optional().transform((val) => {
     if (!val) {
-      logger7.warn("Example plugin variable is not provided (this is expected)");
+      logger8.warn("Example plugin variable is not provided (this is expected)");
     }
     return val;
   })
@@ -651,7 +634,7 @@ var helloWorldAction = {
   },
   handler: async (_runtime, message, _state, _options, callback, _responses) => {
     try {
-      logger7.info("Handling HELLO_WORLD action");
+      logger8.info("Handling HELLO_WORLD action");
       const responseContent = {
         text: "hello world!",
         actions: ["HELLO_WORLD"],
@@ -660,7 +643,7 @@ var helloWorldAction = {
       await callback(responseContent);
       return responseContent;
     } catch (error) {
-      logger7.error("Error in HELLO_WORLD action:", error);
+      logger8.error("Error in HELLO_WORLD action:", error);
       throw error;
     }
   },
@@ -700,12 +683,12 @@ var StarterService = class _StarterService extends Service2 {
     super(runtime);
   }
   static async start(runtime) {
-    logger7.info(`*** Starting starter service - MODIFIED: ${(/* @__PURE__ */ new Date()).toISOString()} ***`);
+    logger8.info(`*** Starting starter service - MODIFIED: ${(/* @__PURE__ */ new Date()).toISOString()} ***`);
     const service = new _StarterService(runtime);
     return service;
   }
   static async stop(runtime) {
-    logger7.info("*** TESTING DEV MODE - STOP MESSAGE CHANGED! ***");
+    logger8.info("*** TESTING DEV MODE - STOP MESSAGE CHANGED! ***");
     const service = runtime.getService(_StarterService.serviceType);
     if (!service) {
       throw new Error("Starter service not found");
@@ -713,7 +696,7 @@ var StarterService = class _StarterService extends Service2 {
     service.stop();
   }
   async stop() {
-    logger7.info("*** THIRD CHANGE - TESTING FILE WATCHING! ***");
+    logger8.info("*** THIRD CHANGE - TESTING FILE WATCHING! ***");
   }
 };
 var managerMsgHandler = async ({
@@ -722,6 +705,27 @@ var managerMsgHandler = async ({
   callback,
   onComplete
 }) => {
+  let _state = await runtime.composeState(message);
+  const _responseContent = {
+    thought: "",
+    actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
+    text: ""
+  };
+  const _responseMessage = {
+    id: asUUID6(v4_default()),
+    entityId: runtime.agentId,
+    agentId: runtime.agentId,
+    content: _responseContent,
+    roomId: message.roomId,
+    createdAt: Date.now()
+  };
+  if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
+    logger8.warn("[Manager Handler] callback");
+    await callback(_responseContent);
+  } else {
+    logger8.warn("[Manager Handler] processActions");
+    await runtime.processActions(message, [_responseMessage], _state, callback);
+  }
   const manageTemplate_Intro = `
   # You are a professional cryptoCurrency trader. If you received message from user, you should start you actions immediately. You are supposed to make a trade by executing actions in the following steps: 1."GET_PRICE" and "GET_NEWS" (these two actions should be take together, not single); 2."PROCESS_PRICE" and "PROCESS_NEW " (these two actions should be take together, not single); 3."MAKE_TRADE"; 4."REPLY".
 
@@ -790,7 +794,7 @@ agent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")
   }
   # Now, choose your next actions:
   `;
-  logger7.warn("[Manager Handler] Saving message to memory and embeddings");
+  logger8.warn("[Manager Handler] Saving message to memory and embeddings");
   if (message && message.content && message.content.text) {
     await Promise.all([
       runtime.addEmbeddingToMemory(message),
@@ -800,11 +804,11 @@ agent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")
   let state = await runtime.composeState(message);
   var apiService = runtime.getService(ApiService.serviceType);
   var userMsgTmp = "";
-  var prompt;
+  var prompt = "";
   if (message && message.content && message.content.text.startsWith("CryptoTrade_Action")) {
     prompt = composePromptFromState2({
       state,
-      template: manageTemplate_Intro + manageTemplate_Example + manageTemplate_Rules + manageTemplate_state + apiService.get_state() + "\n\n" + manageTemplate_take_actions
+      template: manageTemplate_Intro + manageTemplate_Example + manageTemplate_Rules + manageTemplate_state + apiService.getState() + "\n\n" + manageTemplate_take_actions
     });
   } else {
     if (message && message.content && message.content.text) {
@@ -812,18 +816,18 @@ agent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")
     }
     prompt = composePromptFromState2({
       state,
-      template: manageTemplate_Intro + manageTemplate_Example + manageTemplate_Rules + manageTemplate_state + apiService.get_state() + "\n\n" + userMsgTmp + manageTemplate_format
+      template: manageTemplate_Intro + manageTemplate_Example + manageTemplate_Rules + manageTemplate_state + apiService.getState() + "\n\n" + userMsgTmp + manageTemplate_format
     });
   }
-  logger7.warn("[CryptoTrader] *** prompt content ***\n", prompt);
-  const response = await runtime.useModel(ModelType2.TEXT_LARGE, {
+  logger8.warn("[CryptoTrader] *** prompt content ***\n", prompt);
+  const response = await runtime.useModel(ModelType.TEXT_LARGE, {
     prompt
   });
-  logger7.warn("[CryptoTrader] *** response ***\n", response);
+  logger8.warn("[CryptoTrader] *** response ***\n", response);
   const parsedJson = JSON.parse(response);
   let responseContent = null;
   let responseMessages = [];
-  logger7.warn("[CryptoTrader] *** message.id ***\n", message.id);
+  logger8.warn("[CryptoTrader] *** message.id ***\n", message.id);
   if (parsedJson) {
     responseContent = {
       ...parsedJson,
@@ -837,7 +841,7 @@ agent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")
   if (responseContent && message.id) {
     responseContent.inReplyTo = createUniqueUuid(runtime, message.id);
     const responseMessage = {
-      id: asUUID5(v4_default()),
+      id: asUUID6(v4_default()),
       entityId: runtime.agentId,
       agentId: runtime.agentId,
       content: responseContent,
@@ -853,10 +857,10 @@ agent: I'll conduct a research of BTC now. (actions: "GET_PRICE", "GET_NEWS")
   }
 };
 var events = {
-  [EventType5.MESSAGE_RECEIVED]: [
+  [EventType6.MESSAGE_RECEIVED]: [
     async (payload) => {
       if (!payload.callback) {
-        logger7.warn("No callback provided for message");
+        logger8.warn("No callback provided for message");
         return;
       }
       await managerMsgHandler({
@@ -867,28 +871,20 @@ var events = {
       });
     }
   ],
-  [EventType5.MESSAGE_SENT]: [
+  [EventType6.MESSAGE_SENT]: [
     async (payload) => {
-      logger7.warn(`[CryptoTrader] Message sent: ${payload.message}`);
-      if (payload.source && payload.source.startsWith("CryptoTrade_Action")) {
-        await managerMsgHandler({
-          runtime: payload.runtime,
-          message: payload.message,
-          callback: payload.callback,
-          onComplete: payload.onComplete
-        });
-      }
+      logger8.warn(`[CryptoTrader] Message sent: ${payload.message}`);
     }
   ],
-  [EventType5.ACTION_STARTED]: [
+  [EventType6.ACTION_STARTED]: [
     async (payload) => {
-      logger7.warn(`[Bootstrap] Action started: ${payload.actionName} (${payload.actionId})`);
+      logger8.warn(`[Bootstrap] Action started: ${payload.actionName} (${payload.actionId})`);
     }
   ],
-  [EventType5.ACTION_COMPLETED]: [
+  [EventType6.ACTION_COMPLETED]: [
     async (payload) => {
       const status = payload.error ? `failed: ${payload.error.message}` : "completed";
-      logger7.warn(`[Bootstrap] Action ${status}: ${payload.actionName} (${payload.actionId})`);
+      logger8.warn(`[Bootstrap] Action ${status}: ${payload.actionName} (${payload.actionId})`);
     }
   ]
 };
@@ -899,7 +895,7 @@ var starterPlugin = {
     EXAMPLE_PLUGIN_VARIABLE: process.env.EXAMPLE_PLUGIN_VARIABLE
   },
   async init(config) {
-    logger7.info("*** TESTING DEV MODE - PLUGIN MODIFIED AND RELOADED! ***");
+    logger8.info("*** TESTING DEV MODE - PLUGIN MODIFIED AND RELOADED! ***");
     try {
       const validatedConfig = await configSchema.parseAsync(config);
       for (const [key, value] of Object.entries(validatedConfig)) {
@@ -915,10 +911,10 @@ var starterPlugin = {
     }
   },
   models: {
-    [ModelType2.TEXT_SMALL]: async (_runtime, params) => {
+    [ModelType.TEXT_SMALL]: async (_runtime, params) => {
       return "Crypto Plugin ModelType.TEXT_SMALL called...";
     },
-    [ModelType2.TEXT_LARGE]: async (_runtime, {
+    [ModelType.TEXT_LARGE]: async (_runtime, {
       prompt,
       stopSequences = [],
       maxTokens = 8192,
@@ -948,7 +944,8 @@ var starterPlugin = {
     getNewsData,
     getOnChainData,
     processNewsData,
-    processPriceData
+    processPriceData,
+    makeTrade
   ],
   providers: [helloWorldProvider],
   events
