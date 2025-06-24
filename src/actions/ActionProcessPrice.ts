@@ -10,6 +10,7 @@ import {
     EventType,
     logger,
     asUUID,
+    composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
@@ -34,11 +35,11 @@ export const processPriceData: Action = {
     ): Promise<boolean> => {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            let prompt = await service.getPromptOfOnChainData('BTC', service.price_data[10].key)
-            // const prompt = composePromptFromState({
-            //         state,
-            //         template:tmp
-            //     });
+            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[10].key)
+            const prompt = composePromptFromState({
+                    state,
+                    template:tmp
+                });
             let resp = await tryToCallLLMsWithoutFormat(prompt, runtime);
             // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
             //     prompt: prompt,
