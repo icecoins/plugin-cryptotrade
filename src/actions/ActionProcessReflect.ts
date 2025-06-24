@@ -11,7 +11,6 @@ import {
     logger,
     asUUID,
 } from "@elizaos/core";
-// import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
 export const processRelect: Action = {

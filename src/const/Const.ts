@@ -53,6 +53,30 @@ export const manageTemplate_take_actions = `
   }
   # Now, choose your next actions:
   `;
+export async function tryToCallLLMsWithoutFormat(prompt: string, runtime: IAgentRuntime) : Promise<any>{
+    let response = null;
+    for(var i = 0; i < LLM_retry_times; i++){
+      try {
+        logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+        response = await runtime.useModel(ModelType.TEXT_LARGE, {
+          prompt: prompt,
+        });
+
+        // Attempt to parse the XML response
+        logger.warn('[CryptoTrader] *** response ***\n', response);
+        // const parsedXml = parseKeyValueXml(response);
+        // const parsedJson = parseJSONObjectFromText(response);
+        if(response && response != ''){
+          break;
+        }
+        // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
+      } catch (error) {
+        // retry
+        response = null;
+      }
+  }
+  return response;
+}
 export async function tryToCallLLM(prompt: string, runtime: IAgentRuntime) : Promise<any>{
     let parsedJson = null;
     for(var i = 0; i < LLM_retry_times; i++){
@@ -74,4 +98,5 @@ export async function tryToCallLLM(prompt: string, runtime: IAgentRuntime) : Pro
         parsedJson = null;
       }
   }
+  return parsedJson;
 }

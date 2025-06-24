@@ -11,9 +11,9 @@ import {
     logger,
     asUUID,
 } from "@elizaos/core";
-// import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
+import { tryToCallLLMsWithoutFormat } from "src/const/Const";
 export const processPriceData: Action = {
     name: "PROCESS_PRICE",
     similes: [
@@ -33,18 +33,17 @@ export const processPriceData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            const service = runtime.getService(ApiService.serviceType) as ApiService;
-            /**
-            const prompt = composePromptFromState({
-                    state,
-                    template: 'You are a crypto trader, analyze the data below, and feedback a report: ' + data;
-                });
-            }
-            const resp = await runtime.useModel(ModelType.TEXT_LARGE, {
-                prompt: prompt,
-            });
-             */
-            const resp = 'Analysis done, it seems that the price will go down.';
+            let service = runtime.getService(ApiService.serviceType) as ApiService;
+            let prompt = await service.getPromptOfOnChainData('BTC', service.price_data[10].key)
+            // const prompt = composePromptFromState({
+            //         state,
+            //         template:tmp
+            //     });
+            let resp = await tryToCallLLMsWithoutFormat(prompt, runtime);
+            // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
+            //     prompt: prompt,
+            // });
+            // const resp = 'Analysis done, it seems that the price will go down.';
             if(callback){
                 callback({
                     text:`
@@ -67,7 +66,7 @@ export const processPriceData: Action = {
             if(callback){
                 callback({
                     text:`
-                    Error in news analyze:
+                    Error in price analyze:
                     
                     ${error.message}
                     `

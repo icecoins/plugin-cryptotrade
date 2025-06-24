@@ -8,7 +8,6 @@ import {
     HandlerCallback,
     MessageMemory,
     EventType,
-    MemoryType,
     logger,
     asUUID,
 } from "@elizaos/core";
@@ -68,17 +67,21 @@ export const getOnChainData: Action = {
         _responses: Memory[]
     ): Promise<unknown> => {
         try {
-            const service = runtime.getService(ApiService.serviceType) as ApiService;
+            let service = runtime.getService(ApiService.serviceType) as ApiService;
             /*
             const resp = await service.postOnChianAPI(data.blockchain, data.date);
             */
-            const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
+            let r1 = await service.loadPriceData(true);
+            let r2 = await service.loadTransactionData(true);
+            logger.warn('***** ACTION GET_PRICE DATA *****\n', r1, r2)
+            service.dataLoaded = true;
+            // const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
+            const resp = `BTC open price on ${service.price_data[10].value['timeOpen']} is ${service.price_data[10].value['open']}`
             service.data['PRICE'] = resp;
             if(callback){
                 callback({
                     text:`
-                    Here is the on-chain data: 
-                    
+                    Here is the on-chain price data:
                     ${resp}
                     `
                 });

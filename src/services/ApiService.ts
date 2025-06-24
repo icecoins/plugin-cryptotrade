@@ -1,16 +1,9 @@
 import {
     type IAgentRuntime,
     logger,
-    Service,
-    State
-} from "@elizaos/core";
-import { read } from "fs";
-
-import fs_promises from 'fs/promises';
+    Service} from "@elizaos/core";
 import * as fs from 'fs';
 import * as readline from 'readline';
-import { e } from "node_modules/@elizaos/core/dist/index-S6eSMHDH";
-
 
 export const delim = '\n"""\n';
 
@@ -57,7 +50,7 @@ export class ApiService extends Service {
     super(runtime);
   }
   static async start(runtime: IAgentRuntime) {
-    logger.info(`*** Starting api service - MODIFIED: ${new Date().toISOString()} ***`);
+    logger.info(`*** Starting api service -- : ${new Date().toISOString()} ***`);
     const service = new ApiService(runtime);
     service.initState();
     service.initData();
@@ -99,9 +92,11 @@ export class ApiService extends Service {
   }
   public state:{} = {Executing:false, GET_PRICE:'UNDONE'};
   public data:{} = {STEP:0, STAGE:0};
-  public price_data:{} = {};
-  public record:{} = {};
-
+  // public price_data = new Map<string, Record<string, any>>();
+  public price_data = [];
+  public transaction_data = [];
+  public record = {};
+  public dataLoaded = false;
   initState() {
     this.state['Executing'] = false;
     this.state['GET_PRICE'] = 'UNDONE';
@@ -122,9 +117,7 @@ export class ApiService extends Service {
     this.data['REFLECT'] = '';
     this.data['TRADE'] = '';
   }
-  public addPriceData(data: any){
-    this.price_data[data.date] = data;
-  }
+
   public stepEnd(){
     this.record[this.data['STEP']] = {data: this.data, state: this.state};
     logger.error('STEP END, RECORD:\n', JSON.stringify(this.record[this.data['STEP']]))
@@ -154,79 +147,140 @@ export class ApiService extends Service {
       MAKE_TRADE :this.state['MAKE_TRADE']
     })
   }
-
-  async readLocalData(filePath: string){
+  async readLocalCsvFile(filePath: string, which_data:string, reverse: boolean = false): Promise<string>{
     try {  
       let fileStream = fs.createReadStream(filePath);
+      let firstLine = true;
+      let labels = [];
       let rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity
       });
       rl.on('line', (line) => {
-        if(line.startsWith('202')){
-          let data = line.split(',')
-          // TimeOpen,TimeClose,TimeHigh,TimeLow,Name,Open,High,Low,Close,Volume,MarketCap,Timestamp
-          // 0        1         2        3       4    5     6   7   8     9      10        11
-          this.price_data[data[0]] = {
-            TimeOpen:data[0], TimeClose:data[1], 
-            TimeHigh:data[2], TimeLow:data[3],
-            Name:data[4], Open:data[5], 
-            High:data[6], CloseLow:data[7], 
-            Volume:data[8], MarketCap:data[9], 
-            Timestamp:data[10]
+        // day,unique_addresses,total_transactions,total_value_transferred,average_fee,total_size_used,coinbase_transactions
+        // 0        1            2                   3                       4            5             6   
+        if(!firstLine){
+          let data = line.split(','); // ...,2781,42569.7614,43243.16818,41879.18999,...
+          data[0] = data[0].substring(0,10) // 2024-02-01
+          let values: Record<string, string> = {}; // day:xx, unique_addresses:xxx, ...
+          for(let i = 0; i < labels.length; i++){
+            values[labels[i]] = data[i];
+          }
+          switch (which_data) {
+            case "price":
+              this.price_data.push({ key: data[0], value: values });
+              break;
+            case "transaction":
+              this.transaction_data.push({ key: data[0], value: values });
+              logger.error("transaction_data.push: [" + this.transaction_data[this.transaction_data.length-1].key + 
+                              '] ,[' + this.transaction_data[this.transaction_data.length-1].value['total_transactions'] + ']\n');
+              break;
+            default:
+              break;
           }
         }else{
-          console.log(line);
+          logger.error('The first line of the csv file: ' + line);
+          labels = line.split(',')
+          firstLine = false;
         }
       });
       rl.on('close', () => {
-        console.log('Process End');
+        // reverse the price data 
+        // const reversed = new Map(Array.from(this.price_data.entries()).reverse());
+        if(reverse){
+          switch(which_data){
+            case 'price':
+              this.price_data = this.price_data.reverse();
+              break;
+            case 'transaction':
+              this.transaction_data = this.transaction_data.reverse();
+              break;
+            default:
+              break;
+          }
+        }
+        logger.error('Process End');
+        return 'Process End';
       });
     } catch (error) {
-      console.error('File Error: ', error)
+      logger.error('File Error: ', error)
+      return 'Process File Error';
     }
+    return;
   };
-  
-  public async loadPriceData(local: boolean = true){
+  public async loadTransactionData(local: boolean = true): Promise<string>{
+    if(this.dataLoaded){
+      return;
+    }
+    let res = 'error';
     try {
-      let values;
+      let values = {};
       if(local){
-        await this.readLocalData('./data/local/bitcoin_daily_price.csv');
+        res = await this.readLocalCsvFile('./data/local/bitcoin_transaction_statistics.csv', 'transaction', false)
       }else{
         values = await fetchFileFromWeb();
       }
     } catch (error) {
       console.error('loadPriceData error: ', error);
     }
+    return res;
   }
-
-  public async getPromptOfPrice(chain: string = 'BTC', date = '2024-09-26T00:00:00.000Z', windowSize = 5){
-    let price_s = "You are an " + chain + "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
-
-    /*
-    for i, item in enumerate(self._history[-price_window * 3:]):
-      if item['label'] == 'state':
-          state = item['value']
-          state_log = f'Open price: {state["open"]:.2f}'
-          if use_txnstat:
-              txnstat_dict = state['txnstat']
-              for k, v in txnstat_dict.items():
-                  state_log += f', {k}: {v}'
-          if use_tech:
-              tech_dict = state['technical']
-              for k, v in tech_dict.items():
-                  state_log += f', {k}: {v}'
-          price_s += state_log + '\n'
-    */
-   
-    price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
+  public async loadPriceData(local: boolean = true) : Promise<string>{
+    if(this.dataLoaded){
+      return;
+    }
+    let res = 'error';
+    try {
+      let values;
+      if(local){
+        // await this.readLocalPriceData('./data/local/bitcoin_daily_price.csv');
+        res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true)
+      }else{
+        values = await fetchFileFromWeb();
+      }
+    } catch (error) {
+      console.error('loadPriceData error: ', error);
+    }
+    return res;
+  }
+  public async waitForData(): Promise<void>{
+    while(!this.dataLoaded){
+    }
+  }
+  public async getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26T00:00:00.000Z', windowSize:number = 5){
+    await this.waitForData();
+    let idx_price = this.price_data.findIndex(item => item.key === date);
+    let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
+    logger.error('API SERVICE getPromptOfOnChainData: [' + idx_price + '], [' + idx_transaction + ']\n');
+    if(-1 != idx_price && -1 != idx_transaction){
+      let idx_price_stop = idx_price + windowSize;
+      let idx_transaction_stop = idx_transaction + windowSize;
+      let price_s = "You are an " + chain + 
+      "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
+      for(; idx_price < this.price_data.length, idx_price < idx_price_stop, 
+            idx_transaction < this.transaction_data.length, idx_transaction < idx_transaction_stop; 
+            idx_price++, idx_transaction++){
+        let data = 
+        'Open price: ' + this.price_data[idx_price].value['open'];
+        for (const [key, value] of Object.entries(this.transaction_data[idx_transaction])) {
+          data += `, ${key}: ${value}`
+        }
+        data += '\n';
+        price_s += data;
+      }
+      price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
+      logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
+      return price_s;
+    }else{
+      return null;
+    }
   }
 }
 
 
 export async function fetchFileFromWeb() {
   try {
-    const response = await fetch('https://domain.com/file.csv'); // 或者任何支持返回text()的URL，如JSON API等。 
+    const response = await fetch('https://domain.com/file.csv');
     if (!response.ok) { 
       throw new Error('Network response was not ok'); 
     } 

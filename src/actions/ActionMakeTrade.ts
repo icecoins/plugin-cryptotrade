@@ -20,14 +20,14 @@ export const makeTrade: Action = {
         "MAKE_DECISION"
     ],
     description: "Make a cryptocurrency trade",
-    validate: async (runtime: IAgentRuntime, message: MessageMemory, state: State) => {
+    validate: async (_runtime: IAgentRuntime, _message: MessageMemory, _state: State) => {
         // return (state['stage'] && state['stage']=='GET_DATA');
         return true;
     },
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
-        state:State,
+        _state:State,
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]

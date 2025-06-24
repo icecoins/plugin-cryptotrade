@@ -11,7 +11,6 @@ import {
     logger,
     asUUID,
 } from "@elizaos/core";
-// import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
 export const processNewsData: Action = {
@@ -45,7 +44,7 @@ export const processNewsData: Action = {
             // if (content.symbol.length < 2 || content.symbol.length > 10) {
             //     throw new Error("Invalid cryptocurrency symbol");
             // }
-            const service = runtime.getService(ApiService.serviceType) as ApiService;
+            let service = runtime.getService(ApiService.serviceType) as ApiService;
             // const resp = await service.postNewsAPI(data.blockchain, data.date);
             const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
             if(callback){

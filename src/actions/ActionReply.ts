@@ -5,11 +5,9 @@ import {
   type Memory,
   type State,
   logger,
-  composePromptFromState,
 } from '@elizaos/core';
 
 import { z } from "zod";
-import { ModelType } from "@elizaos/core/v2";
 import { ApiService } from 'src/services/ApiService';
 
 export const getBlockchainPriceRequestSchema = z.object({

@@ -12,14 +12,10 @@ import {
   type State,
   type Plugin,
   logger,
-  parseKeyValueXml,
   createUniqueUuid,
-  asUUID,
-  parseJSONObjectFromText,
-  MemoryType,
+  asUUID
 } from '@elizaos/core';
 
-import { BRAND, z } from 'zod';
 import { getNewsData } from "./actions/ActionGetNewsData.ts";
 import { getOnChainData } from "./actions/ActionGetOnChainData.ts";
 import { processNewsData } from "./actions/ActionProcessNews.ts";
@@ -37,24 +33,6 @@ import { manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules,
   LLM_produce_actions,
   LLM_retry_times,
   tryToCallLLM} from './const/Const.ts';
-// import {getOnChainData} from "./actions/action_get_on_chain_data" ;
-/**
- * Defines the configuration schema for a plugin, including the validation rules for the plugin name.
- *
- * @type {import('zod').ZodObject<{ EXAMPLE_PLUGIN_VARIABLE: import('zod').ZodString }>}
- */
-const configSchema = z.object({
-  EXAMPLE_PLUGIN_VARIABLE: z
-    .string()
-    .min(1, 'Example plugin variable is not provided')
-    .optional()
-    .transform((val) => {
-      if (!val) {
-        logger.warn('Example plugin variable is not provided (this is expected)');
-      }
-      return val;
-    }),
-});
 
 /**
  * Example HelloWorld action
@@ -409,51 +387,9 @@ export const starterPlugin: Plugin = {
   },
   async init(config: Record<string, string>) {
     logger.info('*** TESTING DEV MODE - PLUGIN MODIFIED AND RELOADED! ***');
-    try {
-      const validatedConfig = await configSchema.parseAsync(config);
-
-      // Set all environment variables at once
-      for (const [key, value] of Object.entries(validatedConfig)) {
-        if (value) process.env[key] = value;
-      }
-      
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new Error(
-          `Invalid plugin configuration: ${error.errors.map((e) => e.message).join(', ')}`
-        );
-      }
-      throw error;
-    }
   },
   models: {
-    [ModelType.TEXT_SMALL]: async (
-      _runtime,
-      params,
-    ) => {
-       // Maybe you check the prompt and route to different models
-      // if (params.prompt.includes('code')) {
-      //   return await callCodeSpecializedModel(params);
-      // } else if (params.prompt.includes('creative')) {
-      //   return await callCreativeModel(params);
-      // } else {
-      //   return await callGeneralModel(params);
-      // }
-      return 'Crypto Plugin ModelType.TEXT_SMALL called...';
-    },
-    [ModelType.TEXT_LARGE]: async (
-      _runtime,
-      {
-        prompt,
-        stopSequences = [],
-        maxTokens = 8192,
-        temperature = 0.7,
-        frequencyPenalty = 0.7,
-        presencePenalty = 0.7,
-      }: GenerateTextParams
-    ) => {
-      return 'Crypto Plugin ModelType.TEXT_LARGE called......';
-    },
+    
   },
   routes: [
     {
