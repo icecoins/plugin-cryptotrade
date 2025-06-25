@@ -37,39 +37,26 @@ export const getNewsData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            // var result = getBlockchainPriceRequestSchema.safeParse(message.content);
-            // if (!result.success) {
-            //     throw new ValidationError(result.error.message);
-            // }
-            // var data = getBlockchainPriceRequestSchema.parse(message.content);
-            // // Ensure the content has the required shape
-            // const content = {
-            //     symbol: data.blockchain.toString().toUpperCase().trim(),
-            // };
-            // if (content.symbol.length < 2 || content.symbol.length > 10) {
-            //     throw new Error("Invalid cryptocurrency symbol");
-            // }
             const service = runtime.getService(ApiService.serviceType) as ApiService;
-            // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            const resp = '{title:[Devs accuse colleagues from Bitcoin Core of being rogue over the plans to remove the spam filter from Bitcoin], context:[Bitcoin Core will remove OP_RETURN in the next version, scheduled for release in October. OP_RETURN is a script Bitcoin Core devs added to Bitcoin in 2014. It’s worth noting that Bitcoin Core developers have encouraged bitcoiners not to use the Bitcoin blockchain for recording arbitrary data, as there are better options that would not pile extra pressure on the Bitcoin network. At the end of the day, both currencies lost to the original Bitcoin. Will Bitcoin Core’s implementation turn Bitcoin into something different? Will learn by the end of the year.]}';
-            service.data['NEWS'] = resp;
+            const resp = await service.loadNewsData();
+            logger.warn('***** GET NEWS DATA END ***** \n', resp);
+            // const resp = '{title:[Devs accuse colleagues from Bitcoin Core of being rogue over the plans to remove the spam filter from Bitcoin], context:[Bitcoin Core will remove OP_RETURN in the next version, scheduled for release in October. OP_RETURN is a script Bitcoin Core devs added to Bitcoin in 2014. It’s worth noting that Bitcoin Core developers have encouraged bitcoiners not to use the Bitcoin blockchain for recording arbitrary data, as there are better options that would not pile extra pressure on the Bitcoin network. At the end of the day, both currencies lost to the original Bitcoin. Will Bitcoin Core’s implementation turn Bitcoin into something different? Will learn by the end of the year.]}';
             if(callback){
+                if(!resp){
+                    callback({
+                        text:`
+                        Error in fetch news DATA.
+                        `
+                    });
+                    return false;
+                }
                 callback({
                     text:`
-                    Here is the off-chain news: 
-                    
-                    ${resp}
+                    News data loaded.
                     `
                 });
-            }      
-            // await runtime.emitEvent(CRYPTO_EventType.CRYPTO_NOTIFY_ACTION_END, {
-            //     runtime,
-            //     entityId: runtime.agentId,
-            //     status: 'CRYPTO_NOTIFY_ACTION_END',
-            //     source: runtime.character.name,
-            // });
-            // state['stage']='NOTIFY_MANAGER';
-            
+            }            
+            service.data['NEWS'] = 'LOADED';
             service.state['GET_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_GET_NEWS DONE';

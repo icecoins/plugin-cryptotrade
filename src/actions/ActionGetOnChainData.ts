@@ -79,7 +79,6 @@ export const getOnChainData: Action = {
             await service.loadPriceData(true);
             await service.loadTransactionData(true);
             logger.warn('***** GET_PRICE DATA END ***** \n');
-            service.dataLoaded = true;
             // const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
             const resp = `BTC open price on ${service.price_data[10].value['timeOpen']} is ${service.price_data[10].value['open']}`
             service.data['PRICE'] = resp;

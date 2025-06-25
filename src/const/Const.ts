@@ -53,3 +53,4 @@ export const manageTemplate_take_actions = `
   }
   # Now, choose your next actions:
   `;
+export const manageTemplate_news = `You are an BTC cryptocurrency trading analyst. You are required to analyze the following news articles:`

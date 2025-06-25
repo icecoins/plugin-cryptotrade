@@ -6,9 +6,10 @@ import {
 import { rejects } from "assert";
 import { time } from "console";
 import * as fs from 'fs';
-import { resolve } from "path";
+import path, { resolve } from "path";
 import * as readline from 'readline';
 import { LLM_retry_times } from "src/const/Const";
+import { number } from "zod";
 
 export const delim = '\n"""\n';
 
@@ -106,8 +107,10 @@ export class ApiService extends Service {
   // public price_data = new Map<string, Record<string, any>>();
   public price_data = [];
   public transaction_data = [];
+  public news_data = [];
   public record = {};
-  public dataLoaded = false;
+  public onChainDataLoaded = false;
+  public offChainNewsLoaded = false;
   initState() {
     this.state['Executing'] = false;
     this.state['GET_PRICE'] = 'UNDONE';
@@ -218,7 +221,7 @@ export class ApiService extends Service {
 
   public async loadTransactionData(local: boolean = true): Promise<string>{
     return new Promise<string>(async (resolve, reject) =>{
-      if(this.dataLoaded){
+      if(this.onChainDataLoaded){
         resolve('DATA HAS LOADED');
       }else{
         logger.error('DATA: loadTransactionData start');
@@ -236,12 +239,50 @@ export class ApiService extends Service {
         logger.error('loadPriceData error: ', error);
         reject(error);
       }
+      this.onChainDataLoaded = true;
       resolve(res);
+    });
+  }
+
+  public async readFileByAbsPath(path:string, local: boolean = true): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const data = await fs.readFileSync(path, 'utf-8');
+        resolve(data);
+      } 
+      catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public async loadNewsData(chain:string = 'btc', force:boolean = false, local: boolean = true): Promise<any> {
+    return new Promise<any>(async (resolve, reject) => {
+      if(!force && this.offChainNewsLoaded){
+        resolve(true);
+      }
+      let fileNames:string[] = [];
+      let dir = `./data/local/news/${chain}`;
+      const list = await fs.readdirSync(dir, 'utf-8');
+      try {
+        for (const name of list) {
+            fileNames.push(name);
+        }
+        for (const name of fileNames){
+          let news_data = await this.readFileByAbsPath(path.join(dir, name));
+          this.news_data.push({ key:name.split('.')[0], value: news_data });
+        }
+        this.offChainNewsLoaded = true;
+        resolve(true);
+      } 
+      catch (error) {
+        reject(error);
+      }
     });
   }
   public async loadPriceData(local: boolean = true) : Promise<any>{
     return new Promise<any>(async (resolve, reject)=>{
-      if(this.dataLoaded){
+      if(this.onChainDataLoaded){
         resolve('DATA HAS LOADED');
       }else{
         logger.error('DATA: loadPriceData start');
@@ -263,15 +304,10 @@ export class ApiService extends Service {
       resolve(res);
     });
   }
-  public async waitForData(): Promise<void>{
-    while(!this.dataLoaded){
-    }
-  }
   public async getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26T00:00:00.000Z', windowSize:number = 5){
-    await this.waitForData();
     let idx_price = this.price_data.findIndex(item => item.key === date);
     let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
-    logger.error('API SERVICE getPromptOfOnChainData: [' + idx_price + '], [' + idx_transaction + ']\n');
+    // logger.error('API SERVICE getPromptOfOnChainData: [' + idx_price + '], [' + idx_transaction + ']\n');
     if(-1 != idx_price && -1 != idx_transaction){
       let idx_price_stop = idx_price + windowSize;
       let idx_transaction_stop = idx_transaction + windowSize;
@@ -282,10 +318,13 @@ export class ApiService extends Service {
             idx_price++, idx_transaction++){
         let data = 
         'Open price: ' + this.price_data[idx_price].value['open'];
-        for (const [key, value] of Object.entries(this.transaction_data[idx_transaction])) {
-          data += `, ${key}: ${value}`;
+        for (const value of Object.values(this.transaction_data[idx_transaction])) {
+          let labels = Object.keys(value);
+          for (const label of labels){
+            data += `, ${label}: ${value[label]}`; 
+          }
         }
-        data += '\n';
+        data += ';\n';
         price_s += data;
       }
       price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
@@ -295,7 +334,19 @@ export class ApiService extends Service {
       return null;
     }
   }
-
+  public async getPromptOfNewsData(chain: string = 'btc', date:string = '2024-09-26T00:00:00.000Z'){
+    let idx_news = this.news_data.findIndex(item => item.key === date);
+    logger.error('API SERVICE getPromptOfNewsData: [' + idx_news + ']\n');
+    if(-1 != idx_news){
+      let news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. You are required to analyze the following news articles:` + delim;
+      news_s += this.news_data[idx_news].value;
+      news_s += delim + `Write one concise paragraph to analyze the news and estimate the market trend accordingly.`;
+      // logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
+      return news_s;
+    }else{
+      return 'FAILED TO FETCH NEWS DATA';
+    }
+  }
   public async tryToCallLLMsWithoutFormat(prompt: string, runtime: IAgentRuntime) : Promise<any>{
     return new Promise<any>(async (resolve, reject) => {
       let response = null;

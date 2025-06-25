@@ -10,6 +10,7 @@ import {
     EventType,
     logger,
     asUUID,
+    composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
@@ -32,22 +33,17 @@ export const processNewsData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            // var result = getBlockchainPriceRequestSchema.safeParse(message.content);
-            // if (!result.success) {
-            //     throw new ValidationError(result.error.message);
-            // }
-            // var data = getBlockchainPriceRequestSchema.parse(message.content);
-            // // Ensure the content has the required shape
-            // const content = {
-            //     symbol: data.blockchain.toString().toUpperCase().trim(),
-            // };
-            // if (content.symbol.length < 2 || content.symbol.length > 10) {
-            //     throw new Error("Invalid cryptocurrency symbol");
-            // }
+            logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
             let service = runtime.getService(ApiService.serviceType) as ApiService;
             // const resp = await service.postNewsAPI(data.blockchain, data.date);
             // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
-            const resp = service.tryToCallLLMsWithoutFormatWithoutRuntime('');
+            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[10].key)
+            const prompt = composePromptFromState({
+                    state,
+                    template:tmp
+                });
+            let resp = await service.tryToCallLLMsWithoutFormatWithoutRuntime(prompt);
+            logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
             if(callback){
                 callback({
                     text:`
