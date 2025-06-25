@@ -61,23 +61,22 @@ export const getNewsData: Action = {
                     ${resp}
                     `
                 });
-                        
-                // await runtime.emitEvent(CRYPTO_EventType.CRYPTO_NOTIFY_ACTION_END, {
-                //     runtime,
-                //     entityId: runtime.agentId,
-                //     status: 'CRYPTO_NOTIFY_ACTION_END',
-                //     source: runtime.character.name,
-                // });
-                // state['stage']='NOTIFY_MANAGER';
-                
-                service.state['GET_NEWS'] = 'DONE';
-                var message: Memory;
-                message.content.text = 'CryptoTrade_Action_GET_NEWS DONE';
-                message.id = asUUID(v4());
-                runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_GET_NEWS'});
-                logger.warn('***** ACTION GET_NEWS DONE *****')
-                return true;
-            }
+            }      
+            // await runtime.emitEvent(CRYPTO_EventType.CRYPTO_NOTIFY_ACTION_END, {
+            //     runtime,
+            //     entityId: runtime.agentId,
+            //     status: 'CRYPTO_NOTIFY_ACTION_END',
+            //     source: runtime.character.name,
+            // });
+            // state['stage']='NOTIFY_MANAGER';
+            
+            service.state['GET_NEWS'] = 'DONE';
+            var message: Memory;
+            message.content.text = 'CryptoTrade_Action_GET_NEWS DONE';
+            message.id = asUUID(v4());
+            await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_GET_NEWS'});
+            logger.warn('***** ACTION GET_NEWS DONE *****')
+            return true;
         } catch (error) {
             elizaLogger.error("Error in news fetch:", error);
             if(callback){

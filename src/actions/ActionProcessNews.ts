@@ -46,7 +46,8 @@ export const processNewsData: Action = {
             // }
             let service = runtime.getService(ApiService.serviceType) as ApiService;
             // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
+            // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
+            const resp = service.tryToCallLLMsWithoutFormatWithoutRuntime('');
             if(callback){
                 callback({
                     text:`

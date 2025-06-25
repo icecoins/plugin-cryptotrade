@@ -1,9 +1,14 @@
 import {
     type IAgentRuntime,
     logger,
+    ModelType,
     Service} from "@elizaos/core";
+import { rejects } from "assert";
+import { time } from "console";
 import * as fs from 'fs';
+import { resolve } from "path";
 import * as readline from 'readline';
+import { LLM_retry_times } from "src/const/Const";
 
 export const delim = '\n"""\n';
 
@@ -41,6 +46,11 @@ export async function postData(path: string, data: any): Promise<any>{
     });
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export class ApiService extends Service {
   static serviceType = 'apiservice';
@@ -49,6 +59,7 @@ export class ApiService extends Service {
   constructor(runtime: IAgentRuntime) {
     super(runtime);
   }
+
   static async start(runtime: IAgentRuntime) {
     logger.info(`*** Starting api service -- : ${new Date().toISOString()} ***`);
     const service = new ApiService(runtime);
@@ -147,18 +158,17 @@ export class ApiService extends Service {
       MAKE_TRADE :this.state['MAKE_TRADE']
     })
   }
-  async readLocalCsvFile(filePath: string, which_data:string, reverse: boolean = false): Promise<string>{
-    try {  
-      let fileStream = fs.createReadStream(filePath);
-      let firstLine = true;
-      let labels = [];
-      let rl = readline.createInterface({
-        input: fileStream,
+
+  async readLocalCsvFile(filePath: string, which_data:string, reverse: boolean = false): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      const stream = fs.createReadStream(filePath);
+      const rl = readline.createInterface({
+        input: stream,
         crlfDelay: Infinity
       });
+      let firstLine = true;
+      let labels = [];
       rl.on('line', (line) => {
-        // day,unique_addresses,total_transactions,total_value_transferred,average_fee,total_size_used,coinbase_transactions
-        // 0        1            2                   3                       4            5             6   
         if(!firstLine){
           let data = line.split(','); // ...,2781,42569.7614,43243.16818,41879.18999,...
           data[0] = data[0].substring(0,10) // 2024-02-01
@@ -172,8 +182,6 @@ export class ApiService extends Service {
               break;
             case "transaction":
               this.transaction_data.push({ key: data[0], value: values });
-              logger.error("transaction_data.push: [" + this.transaction_data[this.transaction_data.length-1].key + 
-                              '] ,[' + this.transaction_data[this.transaction_data.length-1].value['total_transactions'] + ']\n');
               break;
             default:
               break;
@@ -184,9 +192,8 @@ export class ApiService extends Service {
           firstLine = false;
         }
       });
+
       rl.on('close', () => {
-        // reverse the price data 
-        // const reversed = new Map(Array.from(this.price_data.entries()).reverse());
         if(reverse){
           switch(which_data){
             case 'price':
@@ -200,48 +207,61 @@ export class ApiService extends Service {
           }
         }
         logger.error('Process End');
-        return 'Process End';
+        resolve('Process End');
       });
-    } catch (error) {
-      logger.error('File Error: ', error)
-      return 'Process File Error';
-    }
-    return;
-  };
-  public async loadTransactionData(local: boolean = true): Promise<string>{
-    if(this.dataLoaded){
-      return;
-    }
-    let res = 'error';
-    try {
-      let values = {};
-      if(local){
-        res = await this.readLocalCsvFile('./data/local/bitcoin_transaction_statistics.csv', 'transaction', false)
-      }else{
-        values = await fetchFileFromWeb();
-      }
-    } catch (error) {
-      console.error('loadPriceData error: ', error);
-    }
-    return res;
+
+      rl.on('error', (err) => {
+        reject(err);
+      });
+    });
   }
-  public async loadPriceData(local: boolean = true) : Promise<string>{
-    if(this.dataLoaded){
-      return;
-    }
-    let res = 'error';
-    try {
-      let values;
-      if(local){
-        // await this.readLocalPriceData('./data/local/bitcoin_daily_price.csv');
-        res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true)
+
+  public async loadTransactionData(local: boolean = true): Promise<string>{
+    return new Promise<string>(async (resolve, reject) =>{
+      if(this.dataLoaded){
+        resolve('DATA HAS LOADED');
       }else{
-        values = await fetchFileFromWeb();
+        logger.error('DATA: loadTransactionData start');
       }
-    } catch (error) {
-      console.error('loadPriceData error: ', error);
-    }
-    return res;
+      let res = 'error';
+      try {
+        let values = {};
+        if(local){
+          res = await this.readLocalCsvFile('./data/local/bitcoin_transaction_statistics.csv', 'transaction', false);
+          logger.error('loadTransactionData END');
+        }else{
+          values = await fetchFileFromWeb();
+        }
+      } catch (error) {
+        logger.error('loadPriceData error: ', error);
+        reject(error);
+      }
+      resolve(res);
+    });
+  }
+  public async loadPriceData(local: boolean = true) : Promise<any>{
+    return new Promise<any>(async (resolve, reject)=>{
+      if(this.dataLoaded){
+        resolve('DATA HAS LOADED');
+      }else{
+        logger.error('DATA: loadPriceData start');
+      }
+      let res = 'error';
+      try {
+        let values;
+        if(local){
+          // await this.readLocalPriceData('./data/local/bitcoin_daily_price.csv');
+          res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true);
+          logger.error('loadPriceData END');
+        }else{
+          values = await fetchFileFromWeb();
+        }
+      } catch (error) {
+        logger.error('loadPriceData error: ', error);
+        reject(error);
+      }
+      resolve(res);
+    });
   }
   public async waitForData(): Promise<void>{
     while(!this.dataLoaded){
@@ -263,21 +283,113 @@ export class ApiService extends Service {
         let data = 
         'Open price: ' + this.price_data[idx_price].value['open'];
         for (const [key, value] of Object.entries(this.transaction_data[idx_transaction])) {
-          data += `, ${key}: ${value}`
+          data += `, ${key}: ${value}`;
         }
         data += '\n';
         price_s += data;
       }
       price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
-      logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
+      // logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
       return price_s;
     }else{
       return null;
     }
   }
+
+  public async tryToCallLLMsWithoutFormat(prompt: string, runtime: IAgentRuntime) : Promise<any>{
+    return new Promise<any>(async (resolve, reject) => {
+      let response = null;
+      for(var i = 0; i < LLM_retry_times; i++){
+        try {
+          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+          response = await runtime.useModel(ModelType.TEXT_SMALL, {
+            prompt: prompt,
+          });
+
+          // Attempt to parse the XML response
+          logger.warn('[CryptoTrader] *** response ***\n', response);
+          // const parsedXml = parseKeyValueXml(response);
+          // const parsedJson = parseJSONObjectFromText(response);
+          if(response && response != ''){
+            break;
+          }
+          // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
+        } catch (error) {
+          // retry
+          response = null;
+        }
+      }
+      if(!response){
+        reject('LLM_ERROR')
+      }else{
+        resolve(response);
+      }
+    });
+  }
+
+  public async tryToCallLLMsWithoutFormatWithoutRuntime(prompt: string) : Promise<string>{
+    return new Promise<string>( async (resolve, reject) => {
+      let response = 'LLM HAS NOT RESPONSE';
+      for(var i = 0; i < LLM_retry_times; i++){
+        try {
+          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+          response = await this.runtime.useModel(ModelType.TEXT_SMALL, {
+            prompt: prompt,
+          });
+
+          // Attempt to parse the XML response
+          logger.warn('[CryptoTrader] *** response ***\n', response);
+          // const parsedXml = parseKeyValueXml(response);
+          // const parsedJson = parseJSONObjectFromText(response);
+          if(response && response != ''){
+            break;
+          }
+          // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
+        } catch (error) {
+          // retry
+          response = null;
+        }
+      }
+      if(!response){
+        reject('LLM_ERROR')
+      }else{
+        resolve(response);
+      }
+    });
+  }
+
+  public async tryToCallLLM(prompt: string, runtime: IAgentRuntime) : Promise<any>{
+    return new Promise<any>( async (resolve, reject) => {
+      let parsedJson;
+      for(var i = 0; i < LLM_retry_times; i++){
+        try {
+          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+          const response = await runtime.useModel(ModelType.TEXT_SMALL, {
+            prompt: prompt,
+          });
+
+          // Attempt to parse the XML response
+          logger.warn('[CryptoTrader] *** response ***\n', response);
+          // const parsedXml = parseKeyValueXml(response);
+          // const parsedJson = parseJSONObjectFromText(response);
+          parsedJson = JSON.parse(response);
+          if(response && parsedJson){
+            break;
+          }
+          // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
+        } catch (error) {
+          // retry
+          parsedJson = null;
+        }
+      }
+      if(!parsedJson){
+        reject('LLM_ERROR')
+      }else{
+        resolve(parsedJson);
+      }
+    });
+  }
 }
-
-
 export async function fetchFileFromWeb() {
   try {
     const response = await fetch('https://domain.com/file.csv');

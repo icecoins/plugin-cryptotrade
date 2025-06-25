@@ -31,8 +31,7 @@ import { makeTrade } from './actions/ActionMakeTrade.ts';
 import { manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules, 
   manageTemplate_state, manageTemplate_take_actions, manageTemplate_format, 
   LLM_produce_actions,
-  LLM_retry_times,
-  tryToCallLLM} from './const/Const.ts';
+  LLM_retry_times} from './const/Const.ts';
 
 /**
  * Example HelloWorld action
@@ -185,7 +184,6 @@ const managerMsgHandler = async ({
       logger.warn('[Manager Handler] processActions');
       await runtime.processActions(message, [_responseMessage], _state, callback);
     }
-    
     return;
   }
   
@@ -222,7 +220,7 @@ const managerMsgHandler = async ({
     });
   }
   
-  const parsedJson = await tryToCallLLM(prompt, runtime);
+  const parsedJson = await apiService.tryToCallLLM(prompt, runtime);
   // const parsedJson = JSON.parse('response');
   if(!parsedJson){
     let responseContent = {
@@ -354,14 +352,14 @@ var events:PluginEvents = {
   [EventType.MESSAGE_SENT]: [
     async (payload: MessagePayload) => {
       logger.warn(`[CryptoTrader] Message sent: ${payload.message}`);
-      // if(payload.source && payload.source.startsWith('CryptoTrade_Action')){
-      //   await managerMsgHandler({
-      //     runtime: payload.runtime,
-      //     message: payload.message,
-      //     callback: payload.callback,
-      //     onComplete: payload.onComplete,
-      //   });
-      // }
+      if(payload.source && payload.source.startsWith('CryptoTrade_Action')){
+        await managerMsgHandler({
+          runtime: payload.runtime,
+          message: payload.message,
+          callback: payload.callback,
+          onComplete: payload.onComplete,
+        });
+      }
     },
   ],
 

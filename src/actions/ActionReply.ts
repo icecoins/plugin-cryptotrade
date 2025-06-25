@@ -77,7 +77,9 @@ export const reply: Action = {
         service.state['Executing'] = false;
         service.stepEnd();
       // Call back with the hello world message
-      await callback(responseContent);
+      if(callback){
+        await callback(responseContent);
+      }
     } catch (error) {
       logger.error('Error in REPLY action:', error);
       throw error;

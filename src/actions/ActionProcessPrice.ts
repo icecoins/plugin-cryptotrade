@@ -14,7 +14,6 @@ import {
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
-import { tryToCallLLMsWithoutFormat } from "src/const/Const";
 export const processPriceData: Action = {
     name: "PROCESS_PRICE",
     similes: [
@@ -34,18 +33,30 @@ export const processPriceData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
+            logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
             let service = runtime.getService(ApiService.serviceType) as ApiService;
             let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[10].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
-            let resp = await tryToCallLLMsWithoutFormat(prompt, runtime);
+            let resp = await service.tryToCallLLMsWithoutFormatWithoutRuntime(prompt);
+            logger.error(`[CRYPTOTRADE] resp:\n${resp}\n\n`);
+            let resp2 = await service.tryToCallLLMsWithoutFormat(prompt, runtime);
+            logger.error(`[CRYPTOTRADE] resp2:\n${resp2}\n\n`);
             // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
             //     prompt: prompt,
             // });
             // const resp = 'Analysis done, it seems that the price will go down.';
             if(callback){
+                if(!resp || resp === ''){
+                    callback({
+                        text:`
+                        LLM ERROR: NOT RESPOND
+                        `
+                    });
+                    return;
+                }
                 callback({
                     text:`
                     Here is the analysis of on-chain data: 
@@ -59,7 +70,7 @@ export const processPriceData: Action = {
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_PRICE DONE';
             message.id = asUUID(v4());
-            runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_PRICE'});
+            await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_PRICE'});
             logger.warn('***** ACTION PROCESS_PRICE DONE *****')
             return true;
         } catch (error) {

@@ -67,13 +67,18 @@ export const getOnChainData: Action = {
         _responses: Memory[]
     ): Promise<unknown> => {
         try {
+            logger.error('***** ACTION GET_PRICE START ***** \n');
             let service = runtime.getService(ApiService.serviceType) as ApiService;
             /*
             const resp = await service.postOnChianAPI(data.blockchain, data.date);
             */
-            let r1 = await service.loadPriceData(true);
-            let r2 = await service.loadTransactionData(true);
-            logger.warn('***** ACTION GET_PRICE DATA *****\n', r1, r2)
+            // let r1 = await service.loadPriceData(true);
+            // let r2 = await service.loadTransactionData(true);
+            // logger.warn('***** ACTION GET_PRICE DATA ***** \n[' + r1 + ']\n');
+            // logger.warn('***** ACTION GET_PRICE DATA *****\n[' + r2 + ']\n');
+            await service.loadPriceData(true);
+            await service.loadTransactionData(true);
+            logger.warn('***** GET_PRICE DATA END ***** \n');
             service.dataLoaded = true;
             // const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
             const resp = `BTC open price on ${service.price_data[10].value['timeOpen']} is ${service.price_data[10].value['open']}`
@@ -91,7 +96,7 @@ export const getOnChainData: Action = {
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_GET_PRICE DONE';
             message.id = asUUID(v4());
-            runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message: message, source: 'CryptoTrade_Action_GET_PRICE'});
+            await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message: message, source: 'CryptoTrade_Action_GET_PRICE'});
             logger.warn('***** ACTION GET_PRICE DONE *****')
             return true;
         } catch (error) {

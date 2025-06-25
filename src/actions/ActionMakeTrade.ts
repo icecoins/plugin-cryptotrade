@@ -51,7 +51,7 @@ export const makeTrade: Action = {
             if(callback){
                 callback({
                     text:`
-                    Here is the analysis of on-chain data: 
+                    Here is the analysis of trade data: 
                     
                     ${resp}
                     `
