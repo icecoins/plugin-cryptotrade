@@ -56,14 +56,6 @@ export const makeTrade: Action = {
                     ${resp}
                     `
                 });
-                        
-                // await runtime.emitEvent(CRYPTO_EventType.CRYPTO_NOTIFY_ACTION_END, {
-                //     runtime,
-                //     entityId: runtime.agentId,
-                //     status: 'CRYPTO_NOTIFY_ACTION_END',
-                //     source: runtime.character.name,
-                // });
-                // state['stage']='NOTIFY_MANAGER';
                 
                 service.state['MAKE_TRADE'] = 'DONE';
                 service.data['TRADE'] = resp;

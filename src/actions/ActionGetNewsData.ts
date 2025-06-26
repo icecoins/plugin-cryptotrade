@@ -38,6 +38,13 @@ export const getNewsData: Action = {
     ): Promise<boolean> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
+            
+            if(service.is_action_executing['GET_NEWS']){
+                logger.error('***** ACTION GET_NEWS IS RUNNING, SKIP ACTION  ***** \n');
+                return false;
+            }
+            logger.warn('***** GET NEWS DATA START ***** \n');
+            service.is_action_executing['GET_NEWS'] = true;
             const resp = await service.loadNewsData();
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
             // const resp = '{title:[Devs accuse colleagues from Bitcoin Core of being rogue over the plans to remove the spam filter from Bitcoin], context:[Bitcoin Core will remove OP_RETURN in the next version, scheduled for release in October. OP_RETURN is a script Bitcoin Core devs added to Bitcoin in 2014. It’s worth noting that Bitcoin Core developers have encouraged bitcoiners not to use the Bitcoin blockchain for recording arbitrary data, as there are better options that would not pile extra pressure on the Bitcoin network. At the end of the day, both currencies lost to the original Bitcoin. Will Bitcoin Core’s implementation turn Bitcoin into something different? Will learn by the end of the year.]}';
@@ -63,6 +70,7 @@ export const getNewsData: Action = {
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_GET_NEWS'});
             logger.warn('***** ACTION GET_NEWS DONE *****')
+            service.is_action_executing['GET_NEWS'] = false;
             return true;
         } catch (error) {
             elizaLogger.error("Error in news fetch:", error);

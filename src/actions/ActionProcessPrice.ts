@@ -14,6 +14,7 @@ import {
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
+import { starting_date } from "src/const/Const";
 export const processPriceData: Action = {
     name: "PROCESS_PRICE",
     similes: [
@@ -33,17 +34,22 @@ export const processPriceData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[10].key)
+            if(service.is_action_executing['PROCESS_PRICE']){
+                logger.error('***** ACTION PROCESS_PRICE IS RUNNING, SKIP ACTION  ***** \n');
+                return false;
+            }
+            logger.warn('***** ACTION PROCESS_PRICE START ***** \n');
+            service.is_action_executing['PROCESS_PRICE'] = true;
+            logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
+            const start_day_idx = service.price_data.findIndex(d => d.key === starting_date);
+            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[start_day_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
-            let resp = await service.tryToCallLLMsWithoutFormatWithoutRuntime(prompt);
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             logger.error(`[CRYPTOTRADE] resp:\n${resp}\n\n`);
-            let resp2 = await service.tryToCallLLMsWithoutFormat(prompt, runtime);
-            logger.error(`[CRYPTOTRADE] resp2:\n${resp2}\n\n`);
             // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
             //     prompt: prompt,
             // });
@@ -71,7 +77,8 @@ export const processPriceData: Action = {
             message.content.text = 'CryptoTrade_Action_PROCESS_PRICE DONE';
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_PRICE'});
-            logger.warn('***** ACTION PROCESS_PRICE DONE *****')
+            logger.warn('***** ACTION PROCESS_PRICE DONE *****');
+            service.is_action_executing['PROCESS_PRICE'] = false;
             return true;
         } catch (error) {
             elizaLogger.error("Error in price analyse:", error);

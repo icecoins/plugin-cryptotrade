@@ -52,6 +52,21 @@ function sleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
+function ewma(data: number[], span: number): number[] {
+    const alpha = 2 / (span + 1);
+    const result: number[] = [];
+
+    let prevEwma = data[0]; // 以第一个数据为初始值
+    result.push(prevEwma);
+
+    for (let i = 1; i < data.length; i++) {
+        const currentEwma = alpha * data[i] + (1 - alpha) * prevEwma;
+        result.push(currentEwma);
+        prevEwma = currentEwma;
+    }
+
+    return result;
+}
 
 export class ApiService extends Service {
   static serviceType = 'apiservice';
@@ -105,6 +120,7 @@ export class ApiService extends Service {
   public state:{} = {Executing:false, GET_PRICE:'UNDONE'};
   public data:{} = {STEP:0, STAGE:0};
   // public price_data = new Map<string, Record<string, any>>();
+  public is_action_executing = {};
   public price_data = [];
   public transaction_data = [];
   public news_data = [];
@@ -119,6 +135,13 @@ export class ApiService extends Service {
     this.state['PROCESS_NEWS'] = 'UNDONE';
     this.state['PROCESS_REFLET'] = 'UNDONE';
     this.state['MAKE_TRADE'] = 'UNDONE';
+    
+    this.is_action_executing['GET_PRICE'] = false;
+    this.is_action_executing['GET_NEWS'] = false;
+    this.is_action_executing['PROCESS_PRICE'] = false;
+    this.is_action_executing['PROCESS_NEWS'] = false;
+    this.is_action_executing['PROCESS_REFLET'] = false;
+    this.is_action_executing['MAKE_TRADE'] = false;
   }
 
   initData() {
@@ -175,12 +198,17 @@ export class ApiService extends Service {
         if(!firstLine){
           let data = line.split(','); // ...,2781,42569.7614,43243.16818,41879.18999,...
           data[0] = data[0].substring(0,10) // 2024-02-01
-          let values: Record<string, string> = {}; // day:xx, unique_addresses:xxx, ...
+          let values: Record<string, any> = {}; // day:xx, unique_addresses:xxx, ...
           for(let i = 0; i < labels.length; i++){
-            values[labels[i]] = data[i];
+            if(!('open' === labels[i])){
+              values[labels[i]] = data[i];
+            }else{
+              values[labels[i]] = Number(data[i]);
+            }
           }
           switch (which_data) {
             case "price":
+              // key:date, value:{name1:value1,...}
               this.price_data.push({ key: data[0], value: values });
               break;
             case "transaction":
@@ -280,6 +308,7 @@ export class ApiService extends Service {
       }
     });
   }
+
   public async loadPriceData(local: boolean = true) : Promise<any>{
     return new Promise<any>(async (resolve, reject)=>{
       if(this.onChainDataLoaded){
@@ -291,9 +320,22 @@ export class ApiService extends Service {
       try {
         let values;
         if(local){
-          // await this.readLocalPriceData('./data/local/bitcoin_daily_price.csv');
           res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true);
           logger.error('loadPriceData END');
+          let result = this.calculateMACD();
+          // for (let v of result.macd){
+          //   logger.error('macd: ', v);
+          // }
+          // for (let v of result.ema26){
+          //   logger.error('ema26: ', v);
+          // }
+          for (let i=0; i<this.price_data.length; i++){
+            this.price_data[i].value['ema12'] = result.ema12[i];
+            this.price_data[i].value['ema26'] = result.ema26[i];
+            this.price_data[i].value['macd'] = result.macd[i];
+            this.price_data[i].value['signalLine'] = result.signalLine[i];
+          }
+          logger.error('MACD DATA CALC END');
         }else{
           values = await fetchFileFromWeb();
         }
@@ -304,29 +346,56 @@ export class ApiService extends Service {
       resolve(res);
     });
   }
+
+  public calculateMACD() {
+    //this.price_data.push({ key: data[0], value: values });
+    const openPrices = this.price_data.map(d => d.value['open']);
+    //logger.error('calculateMACD openPrices: ', openPrices);
+    const ema12 = ewma(openPrices, 12);
+    const ema26 = ewma(openPrices, 26);
+
+    const macd = ema12.map((val, idx) => val - ema26[idx]);
+    // logger.error('calculateMACD macd: ', macd);
+    const signalLine = ewma(macd, 9);
+
+    return {
+        ema12,
+        ema26,
+        macd,
+        signalLine,
+    };
+  }
+
   public async getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26T00:00:00.000Z', windowSize:number = 5){
     let idx_price = this.price_data.findIndex(item => item.key === date);
     let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
-    // logger.error('API SERVICE getPromptOfOnChainData: [' + idx_price + '], [' + idx_transaction + ']\n');
     if(-1 != idx_price && -1 != idx_transaction){
-      let idx_price_stop = idx_price + windowSize;
-      let idx_transaction_stop = idx_transaction + windowSize;
+      let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
+      let idx_transaction_start = idx_transaction - windowSize < 0 ? 0 : idx_transaction - windowSize;
       let price_s = "You are an " + chain + 
       "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
-      for(; idx_price < this.price_data.length, idx_price < idx_price_stop, 
-            idx_transaction < this.transaction_data.length, idx_transaction < idx_transaction_stop; 
-            idx_price++, idx_transaction++){
-        let data = 
-        'Open price: ' + this.price_data[idx_price].value['open'];
-        for (const value of Object.values(this.transaction_data[idx_transaction])) {
-          let labels = Object.keys(value);
-          for (const label of labels){
-            data += `, ${label}: ${value[label]}`; 
-          }
+      for(; (idx_price_start <= idx_price) && (idx_transaction_start <= idx_transaction); 
+            idx_price_start++, idx_transaction_start++){
+        let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
+        let transaction_value_set = this.transaction_data[idx_transaction_start].value;
+        let transaction_labels = Object.keys(transaction_value_set);
+        for (const label of transaction_labels){
+          data_str += `, ${label}: ${transaction_value_set[label]}`; 
         }
-        data += ';\n';
-        price_s += data;
+        let macd:number = this.price_data[idx_price_start].value['macd']
+        let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine']
+        let macd_signal = 'hold';
+        if (macd < macd_signal_line){
+          macd_signal = 'buy';
+        }
+        else if (macd > macd_signal_line){
+          macd_signal = 'sell';
+        }
+        data_str += `, macd_signal: ${macd_signal}`;
+        data_str += ';\n';
+        price_s += data_str;
       }
+      // Open price: 17446.36027, day: 2023-01-11, unique_addresses: 1274205, total_transactions: 6726228, total_value_transferred: 250059124.5, average_fee: 0.00055232, total_size_used: 2.13E+11, coinbase_transactions: 405;
       price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
       // logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
       return price_s;
@@ -347,49 +416,18 @@ export class ApiService extends Service {
       return 'FAILED TO FETCH NEWS DATA';
     }
   }
-  public async tryToCallLLMsWithoutFormat(prompt: string, runtime: IAgentRuntime) : Promise<any>{
-    return new Promise<any>(async (resolve, reject) => {
-      let response = null;
-      for(var i = 0; i < LLM_retry_times; i++){
-        try {
-          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
-          response = await runtime.useModel(ModelType.TEXT_SMALL, {
-            prompt: prompt,
-          });
 
-          // Attempt to parse the XML response
-          logger.warn('[CryptoTrader] *** response ***\n', response);
-          // const parsedXml = parseKeyValueXml(response);
-          // const parsedJson = parseJSONObjectFromText(response);
-          if(response && response != ''){
-            break;
-          }
-          // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
-        } catch (error) {
-          // retry
-          response = null;
-        }
-      }
-      if(!response){
-        reject('LLM_ERROR')
-      }else{
-        resolve(response);
-      }
-    });
-  }
-
-  public async tryToCallLLMsWithoutFormatWithoutRuntime(prompt: string) : Promise<string>{
+  public async tryToCallLLMsWithoutFormat(prompt: string) : Promise<string>{
     return new Promise<string>( async (resolve, reject) => {
       let response = 'LLM HAS NOT RESPONSE';
       for(var i = 0; i < LLM_retry_times; i++){
         try {
-          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+          logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** prompt content ***\n', prompt);
           response = await this.runtime.useModel(ModelType.TEXT_SMALL, {
             prompt: prompt,
           });
-
           // Attempt to parse the XML response
-          logger.warn('[CryptoTrader] *** response ***\n', response);
+          logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
           // const parsedXml = parseKeyValueXml(response);
           // const parsedJson = parseJSONObjectFromText(response);
           if(response && response != ''){
@@ -414,13 +452,13 @@ export class ApiService extends Service {
       let parsedJson;
       for(var i = 0; i < LLM_retry_times; i++){
         try {
-          // logger.warn('[CryptoTrader] *** prompt content ***\n', prompt);
+          logger.warn('[CryptoTrader] tryToCallLLM *** prompt ***\n', prompt);
           const response = await runtime.useModel(ModelType.TEXT_SMALL, {
             prompt: prompt,
           });
 
           // Attempt to parse the XML response
-          logger.warn('[CryptoTrader] *** response ***\n', response);
+          logger.warn('[CryptoTrader] tryToCallLLM *** response ***\n', response);
           // const parsedXml = parseKeyValueXml(response);
           // const parsedJson = parseJSONObjectFromText(response);
           parsedJson = JSON.parse(response);

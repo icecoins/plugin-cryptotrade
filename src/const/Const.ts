@@ -1,6 +1,6 @@
-import { IAgentRuntime, logger, ModelType } from "@elizaos/core";
-
 export const LLM_produce_actions = false;
+export const starting_date='2023-04-20';
+export const ending_date='2023-06-16';
 export const LLM_retry_times = 10;
 export const manageTemplate_Intro = `
   # You are a professional cryptoCurrency trader. If you received message from user, you should start you actions immediately. You are supposed to make a trade by executing actions in the following steps: 1."GET_PRICE" and "GET_NEWS" (these two actions should be take together, not single); 2."PROCESS_PRICE" and "PROCESS_NEW " (these two actions should be take together, not single); 3."MAKE_TRADE"; 4."REPLY".\n\n
@@ -53,4 +53,3 @@ export const manageTemplate_take_actions = `
   }
   # Now, choose your next actions:
   `;
-export const manageTemplate_news = `You are an BTC cryptocurrency trading analyst. You are required to analyze the following news articles:`

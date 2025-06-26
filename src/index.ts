@@ -162,7 +162,7 @@ const managerMsgHandler = async ({
   onComplete,
 }: MessageReceivedHandlerParams): Promise<void> => {
   let _state = await runtime.composeState(message);
-  if(LLM_produce_actions){
+  if(!LLM_produce_actions){
     const _responseContent = {
         thought: '',
         actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
@@ -351,8 +351,8 @@ var events:PluginEvents = {
 
   [EventType.MESSAGE_SENT]: [
     async (payload: MessagePayload) => {
-      logger.warn(`[CryptoTrader] Message sent: ${payload.message}`);
-      if(payload.source && payload.source.startsWith('CryptoTrade_Action')){
+      logger.warn(`[CryptoTrader] Message from: [${payload.source}]`);
+      if(LLM_produce_actions && payload.source && payload.source.startsWith('CryptoTrade_Action')){
         await managerMsgHandler({
           runtime: payload.runtime,
           message: payload.message,

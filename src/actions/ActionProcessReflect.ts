@@ -33,6 +33,11 @@ export const processRelect: Action = {
     ): Promise<boolean> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
+            if(service.is_action_executing['PROCESS_REFLECT']){
+                logger.error('***** ACTION PROCESS_REFLECT IS RUNNING, SKIP ACTION  ***** \n');
+                return false;
+            }
+            service.is_action_executing['PROCESS_REFLECT'] = true;
             /**
             const prompt = composePromptFromState({
                     state,
@@ -61,7 +66,8 @@ export const processRelect: Action = {
             message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_REFLET'});
-            logger.warn('***** ACTION PROCESS_REFLET DONE *****')
+            logger.warn('***** ACTION PROCESS_REFLET DONE *****');
+            service.is_action_executing['PROCESS_REFLECT'] = false;
             return true;
         } catch (error) {
             elizaLogger.error("Error in reflect action:", error);

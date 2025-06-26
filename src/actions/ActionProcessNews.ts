@@ -14,6 +14,7 @@ import {
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
+import { starting_date } from "src/const/Const";
 export const processNewsData: Action = {
     name: "PROCESS_NEWS",
     similes: [
@@ -33,16 +34,22 @@ export const processNewsData: Action = {
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
-            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[10].key)
+            if(service.is_action_executing['PROCESS_NEWS']){
+                logger.error('***** ACTION PROCESS_NEWS IS RUNNING, SKIP ACTION  ***** \n');
+                return false;
+            }
+            logger.warn('***** ACTION PROCESS_NEWS START ***** \n');
+            service.is_action_executing['PROCESS_NEWS'] = true;
+            logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
+            const start_day_idx = service.price_data.findIndex(d => d.key === starting_date);
+            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[start_day_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
-            let resp = await service.tryToCallLLMsWithoutFormatWithoutRuntime(prompt);
+            // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
             if(callback){
                 callback({
@@ -60,6 +67,7 @@ export const processNewsData: Action = {
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_NEWS'});
             logger.warn('***** ACTION PROCESS_NEWS DONE *****')
+            service.is_action_executing['PROCESS_NEWS'] = false;
             return true;
         } catch (error) {
             elizaLogger.error("Error in news analyse:", error);
