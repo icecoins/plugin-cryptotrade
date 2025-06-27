@@ -1,5 +1,4 @@
 import {
-    type ActionExample,
     elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
@@ -10,6 +9,7 @@ import {
     EventType,
     logger,
     asUUID,
+    composePromptFromState,
 } from "@elizaos/core";
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
@@ -27,45 +27,41 @@ export const makeTrade: Action = {
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
-        _state:State,
+        state:State,
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
     ): Promise<boolean> => {
         try {
-            // var result = getBlockchainPriceRequestSchema.safeParse(message.content);
-            // if (!result.success) {
-            //     throw new ValidationError(result.error.message);
-            // }
-            // var data = getBlockchainPriceRequestSchema.parse(message.content);
-            // // Ensure the content has the required shape
-            // const content = {
-            //     symbol: data.blockchain.toString().toUpperCase().trim(),
-            // };
-            // if (content.symbol.length < 2 || content.symbol.length > 10) {
-            //     throw new Error("Invalid cryptocurrency symbol");
-            // }
             const service = runtime.getService(ApiService.serviceType) as ApiService;
-            // const resp = await service.postNewsAPI(data.blockchain, data.date);
-            const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
+            let tmp = await service.getPromptOfMakeTrade('BTC');
+            const prompt = composePromptFromState({
+                    state,
+                    template:tmp
+            });
+            // const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
+            service.step_data['TRADE_ACTION_VALUE'] = service.parseAction(resp);
+            service.step_data['TRADE_REASON'] = resp;
+            service.executeTrade();
+            service.calculateROI();
             if(callback){
                 callback({
-                    text:`
-                    Here is the analysis of trade data: 
-                    
-                    ${resp}
-                    `
+                    thought:
+                    `${resp}`,
+                    text:
+                    `Here is the action of Trade Agent:\n\t\tAction: ${service.step_data['TRADE_ACTION']} \n\t\tValue: ${service.step_data['TRADE_ACTION_VALUE']}\n\t\t\nDaily Return:${service.step_data['TODAY_ROI']}`,
                 });
-                
-                service.state['MAKE_TRADE'] = 'DONE';
-                service.data['TRADE'] = resp;
-                var message: Memory;
-                message.content.text = 'CryptoTrade_Action_MAKE_TRADE DONE';
-                message.id = asUUID(v4());
-                runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_MAKE_TRADE'});
-                logger.warn('***** ACTION MAKE_TRADE DONE *****')
-                return true;
             }
+            var message: Memory;
+            message.content.text = 'CryptoTrade_Action_MAKE_TRADE DONE';
+            message.id = asUUID(v4());
+            runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_MAKE_TRADE'});
+            logger.warn('***** ACTION MAKE_TRADE DONE *****')
+            service.step_state['MAKE_TRADE'] = 'DONE';
+            service.step_state['Executing'] = false;
+            service.stepEnd();
+            return true;
         } catch (error) {
             elizaLogger.error("Error in MAKE_TRADE:", error);
             if(callback){

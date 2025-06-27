@@ -10,6 +10,7 @@ import {
     EventType,
     logger,
     asUUID,
+    composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
@@ -38,30 +39,22 @@ export const processRelect: Action = {
                 return false;
             }
             service.is_action_executing['PROCESS_REFLECT'] = true;
-            /**
+            logger.error(`[CRYPTOTRADE] PROCESS_REFLECT START\n`);
+            let tmp = await service.getPromptOfReflectHistory('BTC');
             const prompt = composePromptFromState({
-                    state,
-                    template: 'You are a crypto trader, analyze the history records of your decision, and return a report: ' + 
-                        step: [' + (service.data['STEP']-1) + '], record: {' + 
-                        service.record[(service.data['STEP']-1)]['TRADE'] + '}';
-                });
-            }
-            const resp = await runtime.useModel(ModelType.TEXT_LARGE, {
-                prompt: prompt,
+                state,
+                template:tmp
             });
-             */
-            const resp = 'Reflect: In last stage, I decided to sell part of BTC. Accuracy of my decision is 80%.';
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
+            // const resp = 'Reflect: In last stage, I decided to sell part of BTC. Accuracy of my decision is 80%.';
             if(callback){
                 callback({
-                    text:`
-                    Here is the reflect of records: 
-                    
-                    ${resp}
-                    `
+                    thought:`Reading actions and results on ${service.price_data[service.today_idx].key}...`,
+                    text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
                 });
             }
-            service.data['REFLECT'] = resp;
-            service.state['PROCESS_REFLET'] = 'DONE';
+            service.step_data['ANALYSIS_REPORT_REFLECT'] = resp;
+            service.step_state['PROCESS_REFLET'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
             message.id = asUUID(v4());

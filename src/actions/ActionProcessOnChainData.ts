@@ -39,17 +39,15 @@ export const processPriceData: Action = {
                 logger.error('***** ACTION PROCESS_PRICE IS RUNNING, SKIP ACTION  ***** \n');
                 return false;
             }
-            logger.warn('***** ACTION PROCESS_PRICE START ***** \n');
             service.is_action_executing['PROCESS_PRICE'] = true;
+            logger.warn('***** ACTION PROCESS_PRICE START ***** \n');
             logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
-            const start_day_idx = service.price_data.findIndex(d => d.key === starting_date);
-            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[start_day_idx].key)
+            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            logger.error(`[CRYPTOTRADE] resp:\n${resp}\n\n`);
             // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
             //     prompt: prompt,
             // });
@@ -64,15 +62,12 @@ export const processPriceData: Action = {
                     return;
                 }
                 callback({
-                    text:`
-                    Here is the analysis of on-chain data: 
-                    
-                    ${resp}
-                    `
+                    thought:`Reading On-Chain data on ${service.price_data[service.today_idx].key}...`,
+                    text:`Here is the reponse of On-Chain Data Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            service.data['ANALYSIS_PRICE'] = resp;
-            service.state['PROCESS_PRICE'] = 'DONE';
+            service.step_data['ANALYSIS_REPORT_ON_CHAIN'] = resp;
+            service.step_state['PROCESS_PRICE'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_PRICE DONE';
             message.id = asUUID(v4());

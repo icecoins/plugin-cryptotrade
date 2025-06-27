@@ -23,7 +23,7 @@ export enum Blockchains {
 }
 
 import { v4 } from 'uuid';
-import { starting_date } from "src/const/Const";
+import { ending_date, starting_date } from "src/const/Const";
 
 export const getBlockchainPriceRequestSchema = z.object({
   blockchain: z
@@ -70,24 +70,28 @@ export const getOnChainData: Action = {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
             if(service.is_action_executing['GET_PRICE']){
-                logger.error('***** ACTION GET_PRICE IS RUNNING, SKIP ACTION  ***** \n');
+               //  logger.error('***** ACTION GET_PRICE IS RUNNING, SKIP ACTION  ***** \n');
                 return false;
             }
-            logger.error('***** ACTION GET_PRICE START ***** \n');
             service.is_action_executing['GET_PRICE'] = true;
-            await service.loadPriceData(true);
-            await service.loadTransactionData(true);
+            // logger.error('***** ACTION GET_PRICE START ***** \n');
+            const load_res1 = `service.loadPriceData: ` + await service.loadPriceData(true);
+            const load_res2 = `service.loadTransactionData: ` + await service.loadTransactionData(true);
+            logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
+            if(!service.today_idx || !service.end_day_idx){
+                service.today_idx = service.price_data.findIndex(d => d.key === starting_date);
+                service.end_day_idx = service.price_data.findIndex(d => d.key === ending_date);
+            }
+            logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
+            service.initProject();
             logger.warn('***** GET_PRICE DATA END ***** \n');
-            const start_day_idx = service.price_data.findIndex(d => d.key === starting_date);
             // const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
-            const resp = `BTC open price on ${service.price_data[start_day_idx].value['timeOpen']} is ${service.price_data[10].value['open']}`
-            service.data['PRICE'] = resp;
+            const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
+
             if(callback){
                 callback({
-                    text:`
-                    Here is the on-chain price data:
-                    ${resp}
-                    `
+                    thought:`${load_res1}\n${load_res2}`,
+                    text:`Here is the on-chain price data: ${resp} `
                 });
             }
             var message: Memory;
@@ -95,19 +99,15 @@ export const getOnChainData: Action = {
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message: message, source: 'CryptoTrade_Action_GET_PRICE'});
             logger.warn('***** ACTION GET_PRICE DONE *****')
-            service.state['GET_PRICE'] = 'DONE';
-            service.state['Executing'] = true;
+            service.step_state['GET_PRICE'] = 'DONE';
+            service.step_state['Executing'] = true;
             service.is_action_executing['GET_PRICE'] = false;
             return true;
         } catch (error) {
             elizaLogger.error("Error in price check:", error);
             if(callback){
                 callback({
-                    text:`
-                    Error in price check:
-                    
-                    ${error.message}
-                    `
+                    text:`Error in price check: ${error.message} `
                 });
                 return false;
             }

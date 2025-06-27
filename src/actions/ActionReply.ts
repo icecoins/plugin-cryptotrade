@@ -66,17 +66,14 @@ export const reply: Action = {
     _responses: Memory[]
   ) => {
     try {
-        logger.info('Handling reply action');
-        const service = _runtime.getService(ApiService.serviceType) as ApiService;
-        const responseContent = {
-            thought: '',
-            // text: 'The final decision of trade in step[' + (service.data['STEP']-1) + '] is: ' + service.record[(service.data['STEP']-1)]['TRADE'] + '\n',
-            text: 'The final decision of trade is sell [-0.3/1.0]\n',
-            actions: ['REPLY'],
-        };      
-        service.state['Executing'] = false;
-        service.stepEnd();
-      // Call back with the hello world message
+      logger.info('Handling reply action');
+      const service = _runtime.getService(ApiService.serviceType) as ApiService;
+      const responseContent = {
+          thought: '',
+          // text: 'The final decision of trade in step[' + (service.data['STEP']-1) + '] is: ' + service.record[(service.data['STEP']-1)]['TRADE'] + '\n',
+          text: 'The final decision of trade is ...\n',
+          actions: ['REPLY'],
+      };
       if(callback){
         await callback(responseContent);
       }

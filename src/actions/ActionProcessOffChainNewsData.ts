@@ -39,29 +39,25 @@ export const processNewsData: Action = {
                 logger.error('***** ACTION PROCESS_NEWS IS RUNNING, SKIP ACTION  ***** \n');
                 return false;
             }
-            logger.warn('***** ACTION PROCESS_NEWS START ***** \n');
             service.is_action_executing['PROCESS_NEWS'] = true;
+            logger.warn('***** ACTION PROCESS_NEWS START ***** \n');
             logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
-            const start_day_idx = service.price_data.findIndex(d => d.key === starting_date);
-            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[start_day_idx].key)
+            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
             // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
+            // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
             if(callback){
                 callback({
-                    text:`
-                    Here is the analysis of off-chain news: 
-                    
-                    ${resp}
-                    `
+                    thought:`Reading news on ${service.price_data[service.today_idx].key}...`,
+                    text:`Here is the reponse of News Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            service.data['ANALYSIS_NEWS'] = resp;
-            service.state['PROCESS_NEWS'] = 'DONE';
+            service.step_data['ANALYSIS_REPORT_NEWS'] = resp;
+            service.step_state['PROCESS_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_NEWS DONE';
             message.id = asUUID(v4());

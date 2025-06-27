@@ -16,10 +16,11 @@ import {
   asUUID
 } from '@elizaos/core';
 
-import { getNewsData } from "./actions/ActionGetNewsData.ts";
+import { getNewsData } from "./actions/ActionGetOffChainNewsData.ts";
 import { getOnChainData } from "./actions/ActionGetOnChainData.ts";
-import { processNewsData } from "./actions/ActionProcessNews.ts";
-import { processPriceData } from "./actions/ActionProcessPrice.ts";
+import { processNewsData } from "./actions/ActionProcessOffChainNewsData.ts";
+import { processPriceData } from "./actions/ActionProcessOnChainData.ts";
+import { processRelect } from "./actions/ActionProcessReflect.ts";
 import { reply } from "./actions/ActionReply.ts" ;
 import { ApiService } from './services/ApiService.ts';
 import { ActionEventPayload, composePromptFromState, EventType, messageHandlerTemplate, 
@@ -31,7 +32,9 @@ import { makeTrade } from './actions/ActionMakeTrade.ts';
 import { manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules, 
   manageTemplate_state, manageTemplate_take_actions, manageTemplate_format, 
   LLM_produce_actions,
-  LLM_retry_times} from './const/Const.ts';
+  LLM_retry_times,
+  ending_date,
+  starting_date} from './const/Const.ts';
 
 /**
  * Example HelloWorld action
@@ -162,28 +165,33 @@ const managerMsgHandler = async ({
   onComplete,
 }: MessageReceivedHandlerParams): Promise<void> => {
   let _state = await runtime.composeState(message);
+  let service = runtime.getService(ApiService.serviceType) as ApiService;
   if(!LLM_produce_actions){
-    const _responseContent = {
-        thought: '',
-        actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "MAKE_TRADE", "REPLY"],
-        text: ''
+    do {
+      const _responseContent = {
+          thought: '',
+          actions: ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"],
+          text: ''
       };
-    const _responseMessage = {
-          id: asUUID(v4()),
-          entityId: runtime.agentId,
-          agentId: runtime.agentId,
-          content: _responseContent,
-          roomId: message.roomId,
-          createdAt: Date.now(),
-        };
-    if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
-      _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
-      logger.warn('[Manager Handler] callback');
-      await callback(_responseContent);
-    } else {
-      logger.warn('[Manager Handler] processActions');
-      await runtime.processActions(message, [_responseMessage], _state, callback);
-    }
+      const _responseMessage = {
+            id: asUUID(v4()),
+            entityId: runtime.agentId,
+            agentId: runtime.agentId,
+            content: _responseContent,
+            roomId: message.roomId,
+            createdAt: Date.now(),
+      };
+      if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
+        _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
+        logger.warn('[Manager Handler] callback');
+        await callback(_responseContent);
+      } else {
+        logger.warn('[Manager Handler] processActions');
+        await runtime.processActions(message, [_responseMessage], _state, callback);
+      }
+      service.today_idx += 1;
+    } while (service.today_idx <= service.end_day_idx);
+    logger.warn(`[Manager Handler] END at [${service.today_idx}] , [${service.end_day_idx}]`);
     return;
   }
   
@@ -220,7 +228,7 @@ const managerMsgHandler = async ({
     });
   }
   
-  const parsedJson = await apiService.tryToCallLLM(prompt, runtime);
+  const parsedJson = await apiService.tryToCallLLMs4Json(prompt, runtime);
   // const parsedJson = JSON.parse('response');
   if(!parsedJson){
     let responseContent = {
@@ -402,9 +410,10 @@ export const starterPlugin: Plugin = {
       },
     },
   ],
-  services: [StarterService, ApiService],
+  services: [ApiService],
   actions: [helloWorldAction, reply, getNewsData, 
-    getOnChainData, processNewsData, processPriceData, makeTrade],
+    getOnChainData, processNewsData, processPriceData, 
+    processRelect, makeTrade],
   providers: [helloWorldProvider],
   events:events
 };

@@ -53,3 +53,10 @@ export const manageTemplate_take_actions = `
   }
   # Now, choose your next actions:
   `;
+
+export const STARTING_NET_WORTH: number = 1_000_000;
+export const STARTING_CASH_RATIO = 0.5;
+export const GAS_LIMITS = 21000;
+export const GAS_PRICE = 70;
+export const GAS_FEE = GAS_LIMITS * GAS_PRICE * 1e-9;
+export const EX_RATE = 4e-3  //  exchange fee = txn_amount * ex_rate
