@@ -275,7 +275,7 @@ export class ApiService extends Service {
   public async loadTransactionData(local: boolean = true): Promise<string>{
     return new Promise<string>(async (resolve, reject) =>{
       if(this.onChainDataLoaded){
-        resolve('DATA HAS LOADED');
+        resolve('TRANSACTION DATA HAS LOADED, SKIP');
       }else{
         logger.error('DATA: loadTransactionData start');
       }
@@ -334,10 +334,10 @@ export class ApiService extends Service {
     });
   }
 
-  public async loadPriceData(local: boolean = true) : Promise<any>{
+  public async loadPriceData(chain:string = 'btc', force:boolean = false, local: boolean = true) : Promise<any>{
     return new Promise<any>(async (resolve, reject)=>{
-      if(this.onChainDataLoaded){
-        resolve('DATA HAS LOADED');
+      if(!force && this.onChainDataLoaded){
+        resolve('PRICE DATA HAS LOADED, SKIP');
       }else{
         logger.error('DATA: loadPriceData start');
       }
@@ -407,45 +407,52 @@ export class ApiService extends Service {
     }
     throw new Error('Invalid date');
   }
-  public calculateROI(){
-    //Return On Investment
-    console.error(`[CRYPTOTRADE]: ***** calculateROI start *****`);
-    let next_open_price = this.getNextOpenPriceByDateIdx(this.today_idx);
-    this.net_worth = this.cash + this.coin_held * next_open_price;
-    this.total_roi = this.net_worth / this.starting_net_worth - 1;
-    this.step_data['TODAY_ROI'] = this.net_worth / this.last_net_worth - 1;
-    this.last_net_worth = this.net_worth;
-    console.error(`this.step_data['TODAY_ROI']: ${this.step_data['TODAY_ROI']}`);
-    console.error(`this.last_net_worth: ${this.last_net_worth}`);
-    console.error(`[CRYPTOTRADE]: ***** calculateROI end *****`);
+  
+  public calculateROI(): Promise<any>{
+    return new Promise<any>((resolve, rejects) => {
+      //Return On Investment
+      // console.error(`[CRYPTOTRADE]: ***** calculateROI start *****`);
+      let next_open_price = this.getNextOpenPriceByDateIdx(this.today_idx);
+      this.net_worth = this.cash + this.coin_held * next_open_price;
+      this.total_roi = this.net_worth / this.starting_net_worth - 1;
+      this.step_data['TODAY_ROI'] = this.net_worth / this.last_net_worth - 1;
+      this.last_net_worth = this.net_worth;
+      // console.error(`this.step_data['TODAY_ROI']: ${this.step_data['TODAY_ROI']}`);
+      // console.error(`this.last_net_worth: ${this.last_net_worth}`);
+      console.error(`[CRYPTOTRADE]: ***** calculateROI end *****`);
+      resolve(null);
+    });
   }
 
   public executeTrade(){
-    console.error(`[CRYPTOTRADE]: ***** executeTrade start *****`);
-    this.step_data['TRADE_ACTION'] = 'hold';
-    let action_val = this.step_data['TRADE_ACTION_VALUE'];
-    let open_price = this.price_data[this.today_idx].value['open']
-    if (-1 <= action_val && action_val < 0 && this.coin_held > 0){
-      this.step_data['TRADE_ACTION'] = 'sell';
-      let eth_diff = Math.abs(action_val) * this.coin_held;
-      let cash_diff = eth_diff * open_price;
-      this.coin_held -= eth_diff;
-      this.cash += cash_diff;
-      this.cash -= GAS_FEE * open_price + cash_diff * EX_RATE;
-    }
-    console.error(`action_val: ${action_val}`);
-    console.error(`open_price: ${open_price}`);
-    console.error(`this.coin_held: ${this.coin_held}`);
-    console.error(`this.cash: ${this.cash}`);
-    console.error(`[CRYPTOTRADE]: ***** executeTrade end *****`);
-    if (0 < action_val && action_val <= 1 && this.cash > 0){
-      this.step_data['TRADE_ACTION'] = 'buy';
-      let cash_diff = Math.abs(action_val) * this.cash;
-      let eth_diff = cash_diff / open_price;
-      this.cash -= cash_diff;
-      this.coin_held += eth_diff;
-      this.cash -= GAS_FEE * open_price + cash_diff * EX_RATE;
-    }
+    return new Promise<any>((resolve, rejects) => {
+      // console.error(`[CRYPTOTRADE]: ***** executeTrade start *****`);
+      this.step_data['TRADE_ACTION'] = 'hold';
+      let action_val = this.step_data['TRADE_ACTION_VALUE'];
+      let open_price = this.price_data[this.today_idx].value['open']
+      if (-1 <= action_val && action_val < 0 && this.coin_held > 0){
+        this.step_data['TRADE_ACTION'] = 'sell';
+        let eth_diff = Math.abs(action_val) * this.coin_held;
+        let cash_diff = eth_diff * open_price;
+        this.coin_held -= eth_diff;
+        this.cash += cash_diff;
+        this.cash -= GAS_FEE * open_price + cash_diff * EX_RATE;
+      }
+      else if (0 < action_val && action_val <= 1 && this.cash > 0){
+        this.step_data['TRADE_ACTION'] = 'buy';
+        let cash_diff = Math.abs(action_val) * this.cash;
+        let eth_diff = cash_diff / open_price;
+        this.cash -= cash_diff;
+        this.coin_held += eth_diff;
+        this.cash -= GAS_FEE * open_price + cash_diff * EX_RATE;
+      }
+      // console.error(`action_val: ${action_val}`);
+      // console.error(`open_price: ${open_price}`);
+      // console.error(`this.coin_held: ${this.coin_held}`);
+      // console.error(`this.cash: ${this.cash}`);
+      console.error(`[CRYPTOTRADE]: ***** executeTrade end *****`);
+      resolve(null);
+    });
   }
 
   public parseAction(response: string | number): number {
@@ -463,8 +470,8 @@ export class ApiService extends Service {
         }
     }
     if (typeof response !== 'number' || response < -1 || response > 1) {
-        response = 0;
-        throw new Error(`ERROR: Invalid action: ${response}. Set to no action.`);
+        response = -999;
+        // throw new Error(`ERROR: Invalid action: ${response}. Set to no action.`);
     }
     return response;
   }
@@ -554,19 +561,25 @@ export class ApiService extends Service {
     return trade_s;
   }
 
-  public async tryToCallLLMsWithoutFormat(prompt: string) : Promise<string>{
+  public async tryToCallLLMsWithoutFormat(prompt: string, parseAction:boolean = false) : Promise<string>{
     return new Promise<string>( async (resolve, reject) => {
       let response = 'LLM HAS NOT RESPONSE';
       for(var i = 0; i < LLM_retry_times; i++){
         try {
           logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** prompt content ***\n', prompt);
-          response = await this.runtime.useModel(ModelType.TEXT_SMALL, {
+          response = await this.runtime.useModel(ModelType.TEXT_LARGE, {
             prompt: prompt,
           });
           // Attempt to parse the XML response
           logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
           // const parsedXml = parseKeyValueXml(response);
           // const parsedJson = parseJSONObjectFromText(response);
+          if(parseAction){
+            this.step_data['TRADE_ACTION_VALUE'] = this.parseAction(response);
+            if (-999 === this.step_data['TRADE_ACTION_VALUE']){
+              continue;
+            }
+          }
           if(response && response != ''){
             break;
           }
@@ -590,7 +603,7 @@ export class ApiService extends Service {
       for(var i = 0; i < LLM_retry_times; i++){
         try {
           logger.warn('[CryptoTrader] tryToCallLLM *** prompt ***\n', prompt);
-          const response = await runtime.useModel(ModelType.TEXT_SMALL, {
+          const response = await runtime.useModel(ModelType.TEXT_LARGE, {
             prompt: prompt,
           });
 

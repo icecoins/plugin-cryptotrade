@@ -75,7 +75,7 @@ export const getOnChainData: Action = {
             }
             service.is_action_executing['GET_PRICE'] = true;
             // logger.error('***** ACTION GET_PRICE START ***** \n');
-            const load_res1 = `service.loadPriceData: ` + await service.loadPriceData(true);
+            const load_res1 = `service.loadPriceData: ` + await service.loadPriceData();
             const load_res2 = `service.loadTransactionData: ` + await service.loadTransactionData(true);
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){

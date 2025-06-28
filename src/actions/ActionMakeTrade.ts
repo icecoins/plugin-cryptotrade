@@ -40,17 +40,19 @@ export const makeTrade: Action = {
                     template:tmp
             });
             // const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
-            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            service.step_data['TRADE_ACTION_VALUE'] = service.parseAction(resp);
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt, true);
+            if(service.step_data['TRADE_ACTION_VALUE'] === -999){
+                service.step_data['TRADE_ACTION_VALUE'] = 0;
+            }
             service.step_data['TRADE_REASON'] = resp;
-            service.executeTrade();
-            service.calculateROI();
+            await service.executeTrade();
+            await service.calculateROI();
             if(callback){
                 callback({
                     thought:
                     `${resp}`,
                     text:
-                    `Here is the action of Trade Agent:\n\t\tAction: ${service.step_data['TRADE_ACTION']} \n\t\tValue: ${service.step_data['TRADE_ACTION_VALUE']}\n\t\t\nDaily Return:${service.step_data['TODAY_ROI']}`,
+                    `Here is the action of Trade Agent:\n\t\tAction: ${service.step_data['TRADE_ACTION']} \n\t\tValue: ${service.step_data['TRADE_ACTION_VALUE']}\n\t\t\nDaily Return: ${service.step_data['TODAY_ROI'] * 100} %\n\t\t\nTotal Return: ${service.total_roi * 100} %`,
                 });
             }
             var message: Memory;
