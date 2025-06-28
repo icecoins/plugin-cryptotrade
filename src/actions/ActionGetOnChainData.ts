@@ -82,12 +82,12 @@ export const getOnChainData: Action = {
                 service.today_idx = service.price_data.findIndex(d => d.key === starting_date);
                 service.end_day_idx = service.price_data.findIndex(d => d.key === ending_date);
             }
+            if (!service.project_initialized){
+                service.initProject();
+            }
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
-            service.initProject();
             logger.warn('***** GET_PRICE DATA END ***** \n');
-            // const resp = 'BTC price: {today:{24h Low/High $107,493.00 / $110,269.00}, yesterday:{24h Low/High $108,640.00 / $110,236.00}, }';
             const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
-
             if(callback){
                 callback({
                     thought:`${load_res1}\n${load_res2}`,

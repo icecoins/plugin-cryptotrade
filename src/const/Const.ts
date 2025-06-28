@@ -54,6 +54,7 @@ export const manageTemplate_take_actions = `
   # Now, choose your next actions:
   `;
 
+export const delim = '\n"""\n';
 export const STARTING_NET_WORTH: number = 1_000_000;
 export const STARTING_CASH_RATIO = 0.5;
 export const GAS_LIMITS = 21000;

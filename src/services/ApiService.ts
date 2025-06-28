@@ -3,15 +3,11 @@ import {
     logger,
     ModelType,
     Service} from "@elizaos/core";
-import { rejects } from "assert";
-import { error, time } from "console";
 import * as fs from 'fs';
-import path, { resolve } from "path";
+import path from "path";
 import * as readline from 'readline';
-import { EX_RATE, GAS_FEE, LLM_retry_times, STARTING_CASH_RATIO, starting_date, STARTING_NET_WORTH } from "src/const/Const";
-import { date, number } from "zod";
+import { delim, EX_RATE, GAS_FEE, LLM_retry_times, STARTING_CASH_RATIO, starting_date, STARTING_NET_WORTH } from "src/const/Const";
 
-export const delim = '\n"""\n';
 
 export async function getData(path: string) : Promise<any>{
   await fetch('http://127.0.0.1:8642/' + path)
@@ -52,6 +48,7 @@ function sleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
+
 function ewma(data: number[], span: number): number[] {
     const alpha = 2 / (span + 1);
     const result: number[] = [];
@@ -630,6 +627,7 @@ export class ApiService extends Service {
   }
 
 }
+
 export async function fetchFileFromWeb() {
   try {
     const response = await fetch('https://domain.com/file.csv');
@@ -644,5 +642,3 @@ export async function fetchFileFromWeb() {
     console.error('There has been a problem with your fetch operation:', error); 
   } 
 } 
-
-
