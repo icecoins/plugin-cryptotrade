@@ -40,7 +40,6 @@ export const processPriceData: Action = {
                 return false;
             }
             service.is_action_executing['PROCESS_PRICE'] = true;
-            logger.warn('***** ACTION PROCESS_PRICE START ***** \n');
             logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
             let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
@@ -48,10 +47,6 @@ export const processPriceData: Action = {
                     template:tmp
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            // let resp = await runtime.useModel(ModelType.TEXT_LARGE, {
-            //     prompt: prompt,
-            // });
-            // const resp = 'Analysis done, it seems that the price will go down.';
             if(callback){
                 if(!resp || resp === ''){
                     callback({

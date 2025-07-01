@@ -70,7 +70,6 @@ export const reply: Action = {
       const service = _runtime.getService(ApiService.serviceType) as ApiService;
       const responseContent = {
           thought: '',
-          // text: 'The final decision of trade in step[' + (service.data['STEP']-1) + '] is: ' + service.record[(service.data['STEP']-1)]['TRADE'] + '\n',
           text: 'The final decision of trade is ...\n',
           actions: ['REPLY'],
       };

@@ -114,7 +114,7 @@ export class ApiService extends Service {
     }
   }
   public step_state:{} = {Executing:false, GET_PRICE:'UNDONE'};
-  public step_data:{} = {STEP:0, STAGE:0};
+  public step_data:{} = {STEP:0};
   
   public is_action_executing = {};
   public price_data = [];
@@ -173,13 +173,12 @@ export class ApiService extends Service {
     this.step_data['TRADE_REASON'] = '';
     this.step_data['TRADE_ACTION'] = '';
     this.step_data['TRADE_ACTION_VALUE'] = 0;
-    this.step_data['DAILY_RETURN'] = 0;
     this.step_data['TODAY_ROI'] = 0;
   }
 
   public stepEnd(){
-    this.record.push({step:this.step_data['STEP'], date: this.step_data['DATE'], data: this.step_data, state: this.step_state});
-    logger.error('STEP END, RECORD:\n', JSON.stringify(this.record[this.record.length-1]))
+    this.record.push(structuredClone(this.step_data));
+    // logger.error('STEP END, RECORD:\n', JSON.stringify(this.record));
     this.initData();
     this.initState();
   }
@@ -412,10 +411,9 @@ export class ApiService extends Service {
       let next_open_price = this.getNextOpenPriceByDateIdx(this.today_idx);
       this.net_worth = this.cash + this.coin_held * next_open_price;
       this.total_roi = this.net_worth / this.starting_net_worth - 1;
+      this.step_data['TOTAL_ROI'] = this.total_roi;
       this.step_data['TODAY_ROI'] = this.net_worth / this.last_net_worth - 1;
       this.last_net_worth = this.net_worth;
-      // console.error(`this.step_data['TODAY_ROI']: ${this.step_data['TODAY_ROI']}`);
-      // console.error(`this.last_net_worth: ${this.last_net_worth}`);
       console.error(`[CRYPTOTRADE]: ***** calculateROI end *****`);
       resolve(null);
     });
@@ -518,35 +516,35 @@ export class ApiService extends Service {
       let news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. You are required to analyze the following news articles:` + delim;
       news_s += this.news_data[idx_news].value;
       news_s += delim + `Write one concise paragraph to analyze the news and estimate the market trend accordingly.`;
-      // logger.error('API SERVICE getPromptOfOnChainData: \n' + price_s);
       return news_s;
     }else{
       return 'FAILED TO FETCH NEWS DATA';
     }
   }
 
-  public async getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 10){
-    let record_len = this.record.length;
-    let reflect_end = record_len - 1;
-    let idx_start = reflect_end - windowSize < 0 ? 0 : reflect_end - windowSize;
-    logger.error('API SERVICE getPromptOfReflectHistory: [' + idx_start + ']\n');
+  public async getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 5){
+    const record_len = this.record.length;
     let reflect_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. Your analysis and action history is given in chronological order:` + delim;
-    
     if(0 === record_len){
       reflect_s += 'There is not any analysis and action history yet.';
     }
-    let reflect_data = [];
-    // this.record.push({step:this.data['STEP'], date: this.data['DATE'], data: this.data, state: this.state});
-    for(; idx_start < record_len; idx_start++){
-      const date_set = this.record[idx_start].data;
-      reflect_data.push({
-        Date: date_set['DATE'],
-        Reasoning: date_set['TRADE_REASON'],
-        Action: date_set['TRADE_ACTION'],
-        DailyReturn: date_set['DAILY_RETURN'],
-      });
+    else{
+      let idx_start = record_len - windowSize < 0 ? 0 : record_len - windowSize;
+      for(; idx_start < record_len; idx_start++){
+        const data_set = this.record[idx_start];
+        let reflect_data = [];
+        reflect_data.push({
+          Step: data_set['STEP'],
+          Date: data_set['DATE'],
+          Reasoning: data_set['TRADE_REASON'],
+          Action: data_set['TRADE_ACTION'],
+          ActionValue: data_set['TRADE_ACTION_VALUE'],
+          TotalReturn: data_set['TOTAL_ROI'],
+          DailyReturn: data_set['TODAY_ROI'],
+        });
+        reflect_s += JSON.stringify(reflect_data) + '\n';
+      }
     }
-    reflect_s += JSON.stringify(reflect_data);
     reflect_s += delim + `Reflect on your recent performance and instruct your future trades from a high level, e.g., identify what information is currently more important, and what to be next, like aggresive or conversative. Write one concise paragraph to reflect on your recent trading performance with a focus on the effective strategies and information that led to the most successful outcomes, and the ineffective strategies and information that led to loss of profit. Identify key trends and indicators in the current cryptocurrency market that are likely to influence future trades. Also assess whether a more aggressive or conservative trading approach is warranted.`;
     return reflect_s;
   }
@@ -567,10 +565,7 @@ export class ApiService extends Service {
           response = await this.runtime.useModel(ModelType.TEXT_LARGE, {
             prompt: prompt,
           });
-          // Attempt to parse the XML response
           logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
-          // const parsedXml = parseKeyValueXml(response);
-          // const parsedJson = parseJSONObjectFromText(response);
           if(parseAction){
             this.step_data['TRADE_ACTION_VALUE'] = this.parseAction(response);
             if (-999 === this.step_data['TRADE_ACTION_VALUE']){
@@ -580,7 +575,6 @@ export class ApiService extends Service {
           if(response && response != ''){
             break;
           }
-          // logger.warn('[CryptoTrader] *** Parsed JSON Content ***\n', parsedJson);
         } catch (error) {
           // retry
           response = null;

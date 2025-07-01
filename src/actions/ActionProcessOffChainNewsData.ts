@@ -14,7 +14,6 @@ import {
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "src/services/ApiService";
-import { starting_date } from "src/const/Const";
 export const processNewsData: Action = {
     name: "PROCESS_NEWS",
     similes: [
@@ -40,14 +39,12 @@ export const processNewsData: Action = {
                 return false;
             }
             service.is_action_executing['PROCESS_NEWS'] = true;
-            logger.warn('***** ACTION PROCESS_NEWS START ***** \n');
             logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
             let tmp = await service.getPromptOfNewsData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
-            // const resp = 'Analysis done, the news shows that the price of the cryptocurrency will go down.';
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
             if(callback){

@@ -85,6 +85,7 @@ export const getOnChainData: Action = {
             if (!service.project_initialized){
                 service.initProject();
             }
+            service.step_data["DATE"] = service.price_data[service.today_idx].key;
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             logger.warn('***** GET_PRICE DATA END ***** \n');
             const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;

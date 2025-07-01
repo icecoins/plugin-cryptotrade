@@ -47,7 +47,6 @@ export const getNewsData: Action = {
             logger.warn('***** GET NEWS DATA START ***** \n');
             const resp = `service.loadNewsData: ` + await service.loadNewsData();
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
-            // const resp = '{title:[Devs accuse colleagues from Bitcoin Core of being rogue over the plans to remove the spam filter from Bitcoin], context:[Bitcoin Core will remove OP_RETURN in the next version, scheduled for release in October. OP_RETURN is a script Bitcoin Core devs added to Bitcoin in 2014. It’s worth noting that Bitcoin Core developers have encouraged bitcoiners not to use the Bitcoin blockchain for recording arbitrary data, as there are better options that would not pile extra pressure on the Bitcoin network. At the end of the day, both currencies lost to the original Bitcoin. Will Bitcoin Core’s implementation turn Bitcoin into something different? Will learn by the end of the year.]}';
             if(callback){
                 if(!resp){
                     callback({

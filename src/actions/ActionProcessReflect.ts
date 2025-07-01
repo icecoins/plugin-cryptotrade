@@ -46,7 +46,6 @@ export const processRelect: Action = {
                 template:tmp
             });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            // const resp = 'Reflect: In last stage, I decided to sell part of BTC. Accuracy of my decision is 80%.';
             if(callback){
                 callback({
                     thought:`Reading actions and results on ${service.price_data[service.today_idx].key}...`,
@@ -68,7 +67,6 @@ export const processRelect: Action = {
                 callback({
                     text:`
                     Error in reflect:
-                    
                     ${error.message}
                     `
                 });

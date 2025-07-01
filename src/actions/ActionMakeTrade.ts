@@ -39,12 +39,11 @@ export const makeTrade: Action = {
                     state,
                     template:tmp
             });
-            // const resp = 'After check and analyze the price and news of the cryptocurrency, I think we should sell 30% of it. My trade decision is -0.3/1.0';
             let resp = await service.tryToCallLLMsWithoutFormat(prompt, true);
+            service.step_data['TRADE_REASON'] = resp;
             if(service.step_data['TRADE_ACTION_VALUE'] === -999){
                 service.step_data['TRADE_ACTION_VALUE'] = 0;
             }
-            service.step_data['TRADE_REASON'] = resp;
             await service.executeTrade();
             await service.calculateROI();
             if(callback){
