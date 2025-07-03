@@ -43,12 +43,6 @@ export async function postData(path: string, data: any): Promise<any>{
     });
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function ewma(data: number[], span: number): number[] {
     const alpha = 2 / (span + 1);
     const result: number[] = [];
@@ -123,6 +117,7 @@ export class ApiService extends Service {
   public record = [];
   public onChainDataLoaded = false;
   public offChainNewsLoaded = false;
+  public abortAllTasks = false;
 
   public cash:number;
   public coin_held:number;
@@ -576,11 +571,12 @@ export class ApiService extends Service {
             break;
           }
         } catch (error) {
-          // retry
+          // retry after seconds
           response = null;
         }
       }
       if(!response){
+        this.abortAllTasks = true;
         reject('LLM_ERROR')
       }else{
         resolve(response);
