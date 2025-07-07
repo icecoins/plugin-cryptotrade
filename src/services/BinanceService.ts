@@ -1,5 +1,5 @@
 import { Service, IAgentRuntime, logger } from "@elizaos/core";
-import { MainClient } from 'binance';
+import { CurrentAvgPrice, MainClient, SymbolPrice, Ticker24hrResponse } from 'binance';
 export class BinanceService extends Service {
     static serviceType = 'binance';
     capabilityDescription =
@@ -44,20 +44,51 @@ export class BinanceService extends Service {
             testnet: true, // Connect to testnet environment
         });
 
-        // this.client.getAccountTradeList({ symbol: 'BTCUSDT' })
-        // .then((result) => {
-        //     console.log('getAccountTradeList result: ', result);
-        // })
-        // .catch((err) => {
-        //     console.error('getAccountTradeList error: ', err);
-        // });
-
-        // this.client.getExchangeInfo()
-        // .then((result) => {
-        //     console.log('getExchangeInfo inverse result: ', result);
-        // })
-        // .catch((err) => {
-        //     console.error('getExchangeInfo inverse error: ', err);
-        // });
+        logger.info('*** Service Binance: Client Init done. ***');
+    }
+    async getAvgPrice(coin_symbol:string = 'BTCUSDT'){
+        return new Promise<CurrentAvgPrice>(async (resolve, reject) =>{
+            try {
+                const price = await this.client.getAvgPrice({symbol:coin_symbol});
+                resolve(price);
+            } catch (error) {
+                reject(error)
+            }
+        });
+    }
+    async getTickerPrice(coin_symbol:string = 'BTCUSDT'){
+        return new Promise<SymbolPrice|SymbolPrice[]>(async (resolve, reject) =>{
+            try {
+                const price = await this.client.getSymbolPriceTicker({symbol:coin_symbol});
+                resolve(price);
+            } catch (error) {
+                reject(error)
+            }
+        });
+    }
+    async getDailyPrice(coin_symbol:string = 'BTCUSDT'){
+        return new Promise<Ticker24hrResponse>(async (resolve, reject) =>{
+            try {
+                if(!coin_symbol.includes('USDT')){
+                    coin_symbol = coin_symbol.toUpperCase().concat('USDT');
+                }
+                const price = await this.client.get24hrChangeStatistics({symbol: coin_symbol, type: 'MINI'},);
+                resolve(price);
+            } catch (error) {
+                reject(error)
+            }
+        });
+        // symbol: string;
+        // openPrice: string;
+        // highPrice: string;
+        // lowPrice: string;
+        // lastPrice: string;
+        // volume: string;
+        // quoteVolume: string;
+        // openTime: number;
+        // closeTime: number;
+        // firstId: number;
+        // lastId: number;
+        // count: number;
     }
 }
