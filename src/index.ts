@@ -1,11 +1,9 @@
 import {
   type Action,
   type Content,
-  type GenerateTextParams,
   type HandlerCallback,
   type IAgentRuntime,
   type Memory,
-  ModelType,
   type Provider,
   type ProviderResult,
   Service,
@@ -32,9 +30,8 @@ import { makeTrade } from './actions/ActionMakeTrade.ts';
 import { manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules, 
   manageTemplate_state, manageTemplate_take_actions, manageTemplate_format, 
   LLM_produce_actions,
-  LLM_retry_times,
-  ending_date,
-  starting_date} from './const/Const.ts';
+  LLM_retry_times
+  } from './const/Const.ts';
 
 /**
  * Example HelloWorld action
@@ -243,20 +240,6 @@ const managerMsgHandler = async ({
   let responseContent: Content | null = null;
   let responseMessages: Memory[] = [];
   
-  // Map parsed XML to Content type, handling potential missing fields
-  // if (parsedXml) {
-  //   responseContent = {
-  //     ...parsedXml,
-  //     thought: parsedXml.thought || '',
-  //     actions: parsedXml.actions || ['IGNORE'],
-  //     providers: parsedXml.providers || [],
-  //     text: parsedXml.text || '',
-  //     simple: parsedXml.simple || false,
-  //   };
-  // } else {
-  //   responseContent = null;
-  // }
-  
   logger.warn('[CryptoTrader] *** message.id ***\n', message.id);
   if (parsedJson) {
     responseContent = {
@@ -295,7 +278,7 @@ const managerMsgHandler = async ({
           // this will process GET_DATA/NEWS ....
           await runtime.processActions(message, responseMessages, state, callback);
         }
-  }
+}
 
 const messageReceivedHandler = async ({
   runtime,
@@ -385,6 +368,9 @@ var events:PluginEvents = {
   ]
 };
 
+import { BinanceService } from './services/BinanceService.ts';
+
+
 export const starterPlugin: Plugin = {
   name: 'plugin-exam',
   description: 'Plugin starter for elizaOS',
@@ -394,9 +380,7 @@ export const starterPlugin: Plugin = {
   async init(config: Record<string, string>) {
     logger.info('*** TESTING DEV MODE - PLUGIN MODIFIED AND RELOADED! ***');
   },
-  models: {
-    
-  },
+  models: {},
   routes: [
     {
       name: 'hello-world-route',
@@ -410,10 +394,17 @@ export const starterPlugin: Plugin = {
       },
     },
   ],
-  services: [ApiService],
-  actions: [helloWorldAction, reply, getNewsData, 
-    getOnChainData, processNewsData, processPriceData, 
-    processRelect, makeTrade],
+  services: [ApiService, BinanceService],
+  actions: [
+    helloWorldAction, 
+    reply, 
+    getNewsData, 
+    getOnChainData, 
+    processNewsData, 
+    processPriceData, 
+    processRelect, 
+    makeTrade
+  ],
   providers: [helloWorldProvider],
   events:events
 };

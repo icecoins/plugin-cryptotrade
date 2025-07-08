@@ -23,7 +23,7 @@ export enum Blockchains {
 }
 
 import { v4 } from 'uuid';
-import { ending_date, starting_date } from "src/const/Const";
+import { bear_ending_date, bear_starting_date, bull_ending_date, bull_starting_date, ending_date, sideways_ending_date, sideways_starting_date, starting_date } from "src/const/Const";
 
 export const getBlockchainPriceRequestSchema = z.object({
   blockchain: z
@@ -79,8 +79,26 @@ export const getOnChainData: Action = {
             const load_res2 = `service.loadTransactionData: ` + await service.loadTransactionData(true);
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){
-                service.today_idx = service.price_data.findIndex(d => d.key === starting_date);
-                service.end_day_idx = service.price_data.findIndex(d => d.key === ending_date);
+                let star_date: string, 
+                    end_date: string;
+                if(service.configs['CRYPT_STAGE']){
+                    switch(service.configs['CRYPT_STAGE']){
+                        case 'bull':
+                            star_date = bull_starting_date;
+                            end_date = bull_ending_date;
+                        case 'bear':
+                            star_date = bear_starting_date;
+                            end_date = bear_ending_date;
+                        case 'sideways':
+                            star_date = sideways_starting_date;
+                            end_date = sideways_ending_date;
+                    }
+                }else{
+                    star_date = starting_date;
+                    end_date = ending_date;
+                }
+                service.today_idx = service.price_data.findIndex(d => d.key === star_date);
+                service.end_day_idx = service.price_data.findIndex(d => d.key === end_date);
             }
             if (!service.project_initialized){
                 service.initProject();

@@ -71,6 +71,7 @@ export class ApiService extends Service {
     const service = new ApiService(runtime);
     service.initState();
     service.initData();
+    service.initConfigs();
     return service;
   }
 
@@ -107,9 +108,11 @@ export class ApiService extends Service {
         throw error;
     }
   }
+  
   public step_state:{} = {Executing:false, GET_PRICE:'UNDONE'};
   public step_data:{} = {STEP:0};
   
+  public configs = {};
   public is_action_executing = {};
   public price_data = [];
   public transaction_data = [];
@@ -130,6 +133,19 @@ export class ApiService extends Service {
   public today_idx:number;
   public end_day_idx:number;
   public project_initialized:boolean = false;
+
+  initConfigs(){
+    if(process.env.CRYPT_STARTING_DAY){
+      this.configs['CRYPT_STARTING_DAY'] = process.env.CRYPT_STARTING_DAY;
+    }
+    if(process.env.CRYPT_ENDING_DAY){
+      this.configs['CRYPT_ENDING_DAY'] = process.env.CRYPT_ENDING_DAY;
+    }
+    if(process.env.CRYPT_STAGE){
+      this.configs['CRYPT_STAGE'] = process.env.CRYPT_STAGE;
+    }
+  }
+
   initProject(){
     // project parms should be initialized as soon as the data is loaded
     this.starting_price = this.price_data[this.today_idx].value['open'];
@@ -567,7 +583,7 @@ export class ApiService extends Service {
               continue;
             }
           }
-          if(response && response != ''){
+          if(response && response.length > 10){
             break;
           }
         } catch (error) {

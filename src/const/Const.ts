@@ -1,6 +1,17 @@
 export const LLM_produce_actions = false;
-export const starting_date='2023-04-20';
-export const ending_date='2023-06-21';
+
+export const starting_date='2023-10-01';
+export const ending_date='2023-12-01';
+
+export const bear_starting_date='2023-04-12';
+export const bear_ending_date='2023-06-16';
+
+export const sideways_starting_date='2023-06-17';
+export const sideways_ending_date='2023-08-28';
+
+export const bull_starting_date='2023-10-01';
+export const bull_ending_date='2023-12-01';
+
 export const LLM_retry_times = 10;
 
 export const manageTemplate_Intro = `
