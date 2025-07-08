@@ -1,6 +1,5 @@
 import {
     type ActionExample,
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -13,7 +12,7 @@ import {
     composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 export const processRelect: Action = {
     name: "PROCESS_REFLECT",
     similes: [
@@ -46,7 +45,7 @@ export const processRelect: Action = {
                 template:tmp
             });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            if(callback){
+            if(callback && service.callbackInActions){
                 callback({
                     thought:`Reading actions and results on ${service.price_data[service.today_idx].key}...`,
                     text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
@@ -62,7 +61,7 @@ export const processRelect: Action = {
             service.is_action_executing['PROCESS_REFLECT'] = false;
             return true;
         } catch (error) {
-            elizaLogger.error("Error in reflect action:", error);
+            logger.error("Error in reflect action:", error);
             if(callback){
                 callback({
                     text:`

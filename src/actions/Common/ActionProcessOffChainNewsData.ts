@@ -1,6 +1,5 @@
 import {
     type ActionExample,
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -13,7 +12,7 @@ import {
     composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 export const processNewsData: Action = {
     name: "PROCESS_NEWS",
     similes: [
@@ -40,14 +39,14 @@ export const processNewsData: Action = {
             }
             service.is_action_executing['PROCESS_NEWS'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
-            let tmp = await service.getPromptOfNewsData('BTC', service.price_data[service.today_idx].key)
+            let tmp = await service.getPromptOfProcessNewsData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
                     state,
                     template:tmp
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
-            if(callback){
+            if(callback && service.callbackInActions){
                 callback({
                     thought:`Reading news on ${service.price_data[service.today_idx].key}...`,
                     text:`Here is the reponse of News Analysis Agent:\n\t\t${resp}`,
@@ -63,7 +62,7 @@ export const processNewsData: Action = {
             service.is_action_executing['PROCESS_NEWS'] = false;
             return true;
         } catch (error) {
-            elizaLogger.error("Error in news analyse:", error);
+            logger.error("Error in news analyse:", error);
             if(callback){
                 callback({
                     text:`

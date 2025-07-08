@@ -1,5 +1,4 @@
 import {
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -11,7 +10,7 @@ import {
     asUUID,
 } from "@elizaos/core";
 import {v4} from 'uuid';
-import { BinanceService } from "../services/BinanceService";
+import { BinanceService } from "../../services/BinanceService";
 export const getDailyPrice: Action = {
     name: "CALL_BINANCE_API",
     similes: [
@@ -44,7 +43,7 @@ export const getDailyPrice: Action = {
             logger.warn('***** ACTION CALL_BINANCE_API DONE *****')
             return true;
         } catch (error) {
-            elizaLogger.error("Error in CALL_BINANCE_API:", error);
+            logger.error("Error in CALL_BINANCE_API:", error);
             if(callback){
                 callback({
                     text:`

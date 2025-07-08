@@ -58,6 +58,24 @@ function ewma(data: number[], span: number): number[] {
     return result;
 }
 
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+export interface Article{
+  id:number,
+  url:string,
+  title:string,
+  time:string,
+  content:string,
+  content_simplified:string
+}
+export interface RecordNewsData{
+  date:string,
+  data:Article[]
+}
 export class ApiService extends Service {
   static serviceType = 'apiservice';
   capabilityDescription =
@@ -112,15 +130,18 @@ export class ApiService extends Service {
   public step_state:{} = {Executing:false, GET_PRICE:'UNDONE'};
   public step_data:{} = {STEP:0};
   
-  public configs = {};
   public is_action_executing = {};
   public price_data = [];
   public transaction_data = [];
-  public news_data = [];
+  public news_data:RecordNewsData[] = [];
+  public news_data_simplified = [];
   public record = [];
   public onChainDataLoaded = false;
   public offChainNewsLoaded = false;
   public abortAllTasks = false;
+
+  public callbackInActions = true;
+  public enableNewsSimplification = false;
 
   public cash:number;
   public coin_held:number;
@@ -134,16 +155,35 @@ export class ApiService extends Service {
   public end_day_idx:number;
   public project_initialized:boolean = false;
 
+  public CRYPT_STARTING_DAY:string;
+  public CRYPT_ENDING_DAY:string;
+  public CRYPT_STAGE:string;
+
   initConfigs(){
     if(process.env.CRYPT_STARTING_DAY){
-      this.configs['CRYPT_STARTING_DAY'] = process.env.CRYPT_STARTING_DAY;
+      this.CRYPT_STARTING_DAY = process.env.CRYPT_STARTING_DAY;
     }
     if(process.env.CRYPT_ENDING_DAY){
-      this.configs['CRYPT_ENDING_DAY'] = process.env.CRYPT_ENDING_DAY;
+      this.CRYPT_ENDING_DAY = process.env.CRYPT_ENDING_DAY;
     }
     if(process.env.CRYPT_STAGE){
-      this.configs['CRYPT_STAGE'] = process.env.CRYPT_STAGE;
+      this.CRYPT_STAGE = process.env.CRYPT_STAGE;
     }
+    if(process.env.CRYPT_CALLBACK_IN_ACTIONS){
+      if(process.env.CRYPT_CALLBACK_IN_ACTIONS === 'true'){
+        this.callbackInActions = true;
+      }else{
+        this.callbackInActions = false;
+      }
+    }
+    if(process.env.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
+      if(process.env.CRYPT_ENABLE_NEWS_SIMPLIFICATION === 'true'){
+        this.enableNewsSimplification = true;
+      }else{
+        this.enableNewsSimplification = false;
+      }
+    }
+    logger.error(`Config init done:\nthis.CRYPT_STARTING_DAY: ${this.CRYPT_STARTING_DAY}\nthis.CRYPT_STAGE: ${this.CRYPT_STAGE}\nthis.callbackInActions: ${this.callbackInActions}\nthis.enableNewsSimplification: ${this.enableNewsSimplification}`);
   }
 
   initProject(){
@@ -163,6 +203,7 @@ export class ApiService extends Service {
     this.step_state['GET_NEWS'] = 'UNDONE';
     this.step_state['PROCESS_PRICE'] = 'UNDONE';
     this.step_state['PROCESS_NEWS'] = 'UNDONE';
+    this.step_state['SIMPLIFY_NEWS'] = 'UNDONE';
     this.step_state['PROCESS_REFLET'] = 'UNDONE';
     this.step_state['MAKE_TRADE'] = 'UNDONE';
     
@@ -170,6 +211,7 @@ export class ApiService extends Service {
     this.is_action_executing['GET_NEWS'] = false;
     this.is_action_executing['PROCESS_PRICE'] = false;
     this.is_action_executing['PROCESS_NEWS'] = false;
+    this.is_action_executing['SIMPLIFY_NEWS'] = false;
     this.is_action_executing['PROCESS_REFLET'] = false;
     this.is_action_executing['MAKE_TRADE'] = false;
   }
@@ -185,6 +227,7 @@ export class ApiService extends Service {
     this.step_data['TRADE_ACTION'] = '';
     this.step_data['TRADE_ACTION_VALUE'] = 0;
     this.step_data['TODAY_ROI'] = 0;
+    this.step_data['SIMPLIFIED_NEWS'] = [];
   }
 
   public stepEnd(){
@@ -195,12 +238,14 @@ export class ApiService extends Service {
   }
 
   public updateState(Executing: boolean, GET_PRICE: string, GET_NEWS: string, 
-    PROCESS_PRICE: string, PROCESS_NEWS: string, PROCESS_REFLET: string, MAKE_TRADE: string) {
+    PROCESS_PRICE: string, PROCESS_NEWS: string, SIMPLIFY_NEWS: string,
+    PROCESS_REFLET: string, MAKE_TRADE: string) {
     this.step_state['Executing'] = Executing;
     this.step_state['GET_PRICE'] = GET_PRICE;
     this.step_state['GET_NEWS'] = GET_NEWS;
     this.step_state['PROCESS_PRICE'] = PROCESS_PRICE;
     this.step_state['PROCESS_NEWS'] = PROCESS_NEWS;
+    this.step_state['SIMPLIFY_NEWS'] = SIMPLIFY_NEWS;
     this.step_state['PROCESS_REFLET'] = PROCESS_REFLET;
     this.step_state['MAKE_TRADE'] = MAKE_TRADE;
   }
@@ -211,6 +256,7 @@ export class ApiService extends Service {
       GET_PRICE :this.step_state['GET_PRICE'],
       GET_NEWS :this.step_state['GET_NEWS'],
       PROCESS_PRICE :this.step_state['PROCESS_PRICE'],
+      SIMPLIFY_NEWS :this.step_state['SIMPLIFY_NEWS'],
       PROCESS_NEWS :this.step_state['PROCESS_NEWS'],
       PROCESS_REFLET :this.step_state['PROCESS_REFLET'],
       MAKE_TRADE :this.step_state['MAKE_TRADE']
@@ -329,8 +375,11 @@ export class ApiService extends Service {
             fileNames.push(name);
         }
         for (const name of fileNames){
-          let news_data = await this.readFileByAbsPath(path.join(dir, name));
-          this.news_data.push({ key:name.split('.')[0], value: news_data });
+          let news_str = await this.readFileByAbsPath(path.join(dir, name));
+          // news_str = [{id, url, title, content,...}, {}, ...]
+          let format_news_data:Article[] = JSON.parse(news_str);
+          // name.split('.')[0] = 'yyyy-mm-dd
+          this.news_data.push({ date:name.split('.')[0], data: structuredClone(format_news_data)});
         }
         this.offChainNewsLoaded = true;
         resolve('News data has been successfully loaded.');
@@ -430,7 +479,7 @@ export class ApiService extends Service {
     });
   }
 
-  public executeTrade(){
+  public executeTrade(): Promise<any>{
     return new Promise<any>((resolve, rejects) => {
       // console.error(`[CRYPTOTRADE]: ***** executeTrade start *****`);
       this.step_data['TRADE_ACTION'] = 'hold';
@@ -452,10 +501,6 @@ export class ApiService extends Service {
         this.coin_held += eth_diff;
         this.cash -= GAS_FEE * open_price + cash_diff * EX_RATE;
       }
-      // console.error(`action_val: ${action_val}`);
-      // console.error(`open_price: ${open_price}`);
-      // console.error(`this.coin_held: ${this.coin_held}`);
-      // console.error(`this.cash: ${this.cash}`);
       console.error(`[CRYPTOTRADE]: ***** executeTrade end *****`);
       resolve(null);
     });
@@ -482,7 +527,7 @@ export class ApiService extends Service {
     return response;
   }
 
-  public async getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26', windowSize:number = 5){
+  public getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26', windowSize:number = 5){
     let idx_price = this.price_data.findIndex(item => item.key === date);
     let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
     if(-1 != idx_price && -1 != idx_transaction){
@@ -520,20 +565,83 @@ export class ApiService extends Service {
     }
   }
 
-  public async getPromptOfNewsData(chain: string = 'btc', date:string = '2024-09-26'){
-    let idx_news = this.news_data.findIndex(item => item.key === date);
+  public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26'){
+    let idx_news = this.news_data.findIndex(item => item.date === date);
     logger.error('API SERVICE getPromptOfNewsData: [' + idx_news + ']\n');
-    if(-1 != idx_news){
-      let news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. You are required to analyze the following news articles:` + delim;
-      news_s += this.news_data[idx_news].value;
-      news_s += delim + `Write one concise paragraph to analyze the news and estimate the market trend accordingly.`;
+    if(-1 != idx_news && this.news_data[idx_news].data.length > 0){
+      let news_s = '';
+      if(this.enableNewsSimplification){
+        if(!(this.news_data.length > 0)){
+          throw new Error(`Error: The SIMPLIFIED_NEWS set on ${this.step_data['DATE']} is empty.`);
+        }
+        news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. There are some articles about cryptocurrency today, and an analyst has completed the summary. You are required to analyze the following summary of these articles:` + delim;
+        for(let i = 0; i < this.news_data[idx_news].data.length; i++){
+          news_s += `{title:${this.news_data[idx_news].data[i].title}, time:${this.news_data[idx_news].data[i].time}, content:${this.news_data[idx_news].data[i].content_simplified}}\n`;
+        }
+        news_s += delim + `Write one concise paragraph to analyze the summary and estimate the market trend accordingly.`;
+      }else{
+        news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. You are required to analyze the following news articles:` + delim;
+        news_s += JSON.stringify(this.news_data[idx_news].data);
+        news_s += delim + `Write one concise paragraph to analyze the news and estimate the market trend accordingly.`;
+      }
       return news_s;
     }else{
       return 'FAILED TO FETCH NEWS DATA';
     }
   }
 
-  public async getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 5){
+  public async simplifyNewsData(chain: string = 'btc', date:string = this.step_data['DATE']){
+    /*
+    There are 1~5 articles selected everyday,
+    build prompt and simplify them with LLM in a loop.
+    */
+    let idx_news_set = this.news_data.findIndex(item => item.date === date);
+    logger.error('API SERVICE getPromptOfSimplifyNewsData: [' + idx_news_set + ']\n');
+    if(-1 != idx_news_set && this.news_data[idx_news_set].data.length > 0){
+      const simp_tmp = `
+You are a parsing agent for cryptocurrency news. Your goal is to extract and structure key factual information from each article so that it can be used as input by downstream generation agents.
+Input includes:
+- Title
+- Time
+- Full article text
+
+Instructions:
+- Do not write in full prose or natural language.
+- Extract core information points in a structured, atomic way.
+- Avoid summarizing style or commentary; focus only on facts.
+- Output should be short, less than 500 words.
+- Organize output in a consistent and machine-readable format (e.g., JSON or labeled bullet points).
+- Include fields such as: main events, impact, involved entities (optional: sentiment, domain).
+
+Output Format Example:
+{
+  "short_summary": "...",
+  "impact": "...",
+  "domain": "...",
+  "sentiment": "neutral",
+  "key_points": ["...", "..."],
+}
+
+Input article data:
+` + delim;
+      for (let i = 0; i < this.news_data[idx_news_set].data.length; i++){
+        // this.news_data[idx_news_set].data = [{title, time, content}, {...}, ...]
+        let simp_s = simp_tmp + JSON.stringify({
+          title:this.news_data[idx_news_set].data[i].title,
+          time:this.news_data[idx_news_set].data[i].time,
+          content:this.news_data[idx_news_set].data[i].content
+        });
+        simp_s += delim;
+        const resp = await this.tryToCallLLMsWithoutFormat(simp_s, false, false, /*maxTokens:*/200);
+        this.news_data[idx_news_set].data[i].content_simplified = resp;
+      }
+      return 'simplifyNewsData done, data record to this.news_data[idx_news_set]';
+    }else{
+      return 'FAILED TO FETCH NEWS DATA';
+    }
+  }
+
+  public getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 5){
     const record_len = this.record.length;
     let reflect_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. Your analysis and action history is given in chronological order:` + delim;
     if(0 === record_len){
@@ -560,30 +668,34 @@ export class ApiService extends Service {
     return reflect_s;
   }
 
-  public async getPromptOfMakeTrade(chain: string = 'btc'){
+  public getPromptOfMakeTrade(chain: string = 'btc'){
     let trade_s = `You are an experienced ${chain.toUpperCase()} cryptocurrency trader and you are trying to maximize your overall profit by trading ${chain.toUpperCase()}. In each day, you will make an action to buy or sell ${chain.toUpperCase()}. You are assisted by a few analysts below and need to decide the final action.`
     trade_s += `\n\nON-CHAIN ANALYST REPORT:${delim}${this.step_data['ANALYSIS_REPORT_ON_CHAIN']}${delim}\nNEWS ANALYST REPORT:${delim}${this.step_data['ANALYSIS_REPORT_NEWS']}${delim}\nREFLECTION ANALYST REPORT:${delim}${this.step_data['ANALYSIS_REPORT_REFLECT']}${delim}\n`;
     trade_s += 'Now, start your response with your brief reasoning over the given reports. Then, based on the synthesized reports, conclude a clear market trend, emphasizing long-term strategies over short-term gains. Finally, indicate your trading action as a 1-decimal float in the range of [-1,1], reflecting your confidence in the market trend and your strategic decision to manage risk appropriately.'
     return trade_s;
   }
 
-  public async tryToCallLLMsWithoutFormat(prompt: string, parseAction:boolean = false) : Promise<string>{
+  public async tryToCallLLMsWithoutFormat(prompt: string, parseAction:boolean = false, debug = true, maxTokens = 750, temperature = 0.7, contextSize = 16384) : Promise<string>{
     return new Promise<string>( async (resolve, reject) => {
       let response = 'LLM HAS NOT RESPONSE';
       for(var i = 0; i < LLM_retry_times; i++){
         try {
-          logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** prompt content ***\n', prompt);
+          if(debug){
+            logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** prompt content ***\n', prompt);
+          }
           response = await this.runtime.useModel(ModelType.TEXT_LARGE, {
             prompt: prompt,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            contextSize: contextSize
           });
-          logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
           if(parseAction){
             this.step_data['TRADE_ACTION_VALUE'] = this.parseAction(response);
             if (-999 === this.step_data['TRADE_ACTION_VALUE']){
               continue;
             }
           }
-          if(response && response.length > 10){
+          if(response && response.length > 25 && response.length < maxTokens * 4){
             break;
           }
         } catch (error) {
@@ -595,6 +707,10 @@ export class ApiService extends Service {
         this.abortAllTasks = true;
         reject('LLM_ERROR')
       }else{
+        if(debug){
+          logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
+        }
+        await sleep(1000);
         resolve(response);
       }
     });

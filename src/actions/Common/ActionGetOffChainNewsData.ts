@@ -1,6 +1,5 @@
 import {
     type ActionExample,
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -13,7 +12,7 @@ import {
 } from "@elizaos/core";
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 export const getNewsData: Action = {
     name: "GET_NEWS",
     similes: [
@@ -47,7 +46,7 @@ export const getNewsData: Action = {
             logger.warn('***** GET NEWS DATA START ***** \n');
             const resp = `service.loadNewsData: ` + await service.loadNewsData();
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
-            if(callback){
+            if(callback && service.callbackInActions){
                 if(!resp){
                     callback({
                         text:`Error in fetch news DATA. `
@@ -68,7 +67,7 @@ export const getNewsData: Action = {
             service.is_action_executing['GET_NEWS'] = false;
             return true;
         } catch (error) {
-            elizaLogger.error("Error in news fetch:", error);
+            logger.error("Error in news fetch:", error);
             if(callback){
                 callback({
                     text:`

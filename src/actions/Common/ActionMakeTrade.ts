@@ -1,5 +1,4 @@
 import {
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -13,7 +12,7 @@ import {
 } from "@elizaos/core";
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 export const makeTrade: Action = {
     name: "MAKE_TRADE",
     similes: [
@@ -39,7 +38,7 @@ export const makeTrade: Action = {
                     state,
                     template:tmp
             });
-            let resp = await service.tryToCallLLMsWithoutFormat(prompt, true);
+            let resp = await service.tryToCallLLMsWithoutFormat(prompt, true, true);
             service.step_data['TRADE_REASON'] = resp;
             if(service.step_data['TRADE_ACTION_VALUE'] === -999){
                 service.step_data['TRADE_ACTION_VALUE'] = 0;
@@ -47,6 +46,7 @@ export const makeTrade: Action = {
             await service.executeTrade();
             await service.calculateROI();
             if(callback){
+                // Always callback afer make trade decision.
                 callback({
                     thought:
                     `${resp}`,
@@ -64,12 +64,11 @@ export const makeTrade: Action = {
             service.stepEnd();
             return true;
         } catch (error) {
-            elizaLogger.error("Error in MAKE_TRADE:", error);
+            logger.error("Error in MAKE_TRADE:", error);
             if(callback){
                 callback({
                     text:`
-                    Error in news analyze:
-                    
+                    Error in MAKE_TRADE:
                     ${error.message}
                     `
                 });

@@ -1,6 +1,5 @@
 import {
     type ActionExample,
-    elizaLogger,
     type IAgentRuntime,
     type Memory,
     type State,
@@ -12,7 +11,7 @@ import {
     asUUID,
 } from "@elizaos/core";
 
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 
 import { z } from "zod";
 
@@ -23,7 +22,7 @@ export enum Blockchains {
 }
 
 import { v4 } from 'uuid';
-import { bear_ending_date, bear_starting_date, bull_ending_date, bull_starting_date, ending_date, sideways_ending_date, sideways_starting_date, starting_date } from "../const/Const";
+import { bear_ending_date, bear_starting_date, bull_ending_date, bull_starting_date, ending_date, sideways_ending_date, sideways_starting_date, starting_date } from "../../const/Const";
 
 export const getBlockchainPriceRequestSchema = z.object({
   blockchain: z
@@ -81,17 +80,20 @@ export const getOnChainData: Action = {
             if(!service.today_idx || !service.end_day_idx){
                 let star_date: string, 
                     end_date: string;
-                if(service.configs['CRYPT_STAGE']){
-                    switch(service.configs['CRYPT_STAGE']){
+                if(service.CRYPT_STAGE){
+                    switch(service.CRYPT_STAGE){
                         case 'bull':
                             star_date = bull_starting_date;
                             end_date = bull_ending_date;
+                            break;
                         case 'bear':
                             star_date = bear_starting_date;
                             end_date = bear_ending_date;
+                            break;
                         case 'sideways':
                             star_date = sideways_starting_date;
                             end_date = sideways_ending_date;
+                            break;
                     }
                 }else{
                     star_date = starting_date;
@@ -107,7 +109,7 @@ export const getOnChainData: Action = {
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             logger.warn('***** GET_PRICE DATA END ***** \n');
             const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
-            if(callback){
+            if(callback && service.callbackInActions){
                 callback({
                     thought:`${load_res1}\n${load_res2}`,
                     text:`Here is the on-chain price data: ${resp} `
@@ -123,7 +125,7 @@ export const getOnChainData: Action = {
             service.is_action_executing['GET_PRICE'] = false;
             return true;
         } catch (error) {
-            elizaLogger.error("Error in price check:", error);
+            logger.error("Error in price check:", error);
             if(callback){
                 callback({
                     text:`Error in price check: ${error.message} `

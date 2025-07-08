@@ -1,17 +1,8 @@
 import type { ActionEventPayload, MessagePayload, MessageReceivedHandlerParams, Plugin, PluginEvents } from '@elizaos/core';
 import {
-  type Action,
   type Content,
   EventType,
-  type GenerateTextParams,
-  type HandlerCallback,
-  type IAgentRuntime,
   type Memory,
-  ModelType,
-  type Provider,
-  type ProviderResult,
-  Service,
-  type State,
   asUUID,
   composePromptFromState,
   createUniqueUuid,
@@ -19,17 +10,17 @@ import {
 } from '@elizaos/core';
 
 import { BinanceService } from './services/BinanceService.ts';
-import { getNewsData } from './actions/ActionGetOffChainNewsData.ts';
-import { getOnChainData } from './actions/ActionGetOnChainData.ts';
-import { makeTrade } from './actions/ActionMakeTrade.ts';
-import { processNewsData } from './actions/ActionProcessOffChainNewsData.ts';
-import { processPriceData } from './actions/ActionProcessOnChainData.ts';
-import { processRelect } from './actions/ActionProcessReflect.ts';
-import { reply } from './actions/ActionReply.ts';
-import { getDailyPrice } from './actions/ActionBinanceGetDailyPrice';
+import { getNewsData } from './actions/Common/ActionGetOffChainNewsData.ts';
+import { getOnChainData } from './actions/Common/ActionGetOnChainData.ts';
+import { makeTrade } from './actions/Common/ActionMakeTrade.ts';
+import { processNewsData } from './actions/Common/ActionProcessOffChainNewsData.ts';
+import { processPriceData } from './actions/Common/ActionProcessOnChainData.ts';
+import { processRelect } from './actions/Common/ActionProcessReflect.ts';
+import { getDailyPrice } from './actions/Binance/ActionBinanceGetDailyPrice.ts';
 import { LLM_produce_actions, manageTemplate_Intro, manageTemplate_Example, manageTemplate_Rules, manageTemplate_state, manageTemplate_take_actions, manageTemplate_format, LLM_retry_times } from './const/Const.ts';
 import { ApiService } from './services/ApiService.ts';
 import { v4 } from 'uuid';
+import { simplifyNewsData } from './actions/Common/ActionSummaryNewsData.ts';
 
 const managerMsgHandler = async ({
   runtime,
@@ -54,7 +45,11 @@ const managerMsgHandler = async ({
     do {
       let actions:string[] = null;
       if(args[1].match('1')){
-        actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE", "PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"];
+        actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
+        if(service.enableNewsSimplification){
+          actions.push('SUMMARIZE_NEWS');
+        }
+        actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);
       }else if(args[2].match('1')){
         actions = ["CALL_BINANCE_API"];
       }
@@ -241,7 +236,7 @@ export const cryptoPlugin: Plugin = {
   ],
   services: [ApiService, BinanceService],
   actions: [
-    reply, 
+    simplifyNewsData,
     getNewsData, 
     getOnChainData, 
     processNewsData, 

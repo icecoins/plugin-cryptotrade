@@ -1,6 +1,5 @@
 import {
     type ActionExample,
-    elizaLogger,
     type HandlerCallback,
     type IAgentRuntime,
     type Memory,
@@ -13,7 +12,7 @@ import {
     composePromptFromState,
 } from "@elizaos/core";
 import {v4} from 'uuid';
-import { ApiService } from "../services/ApiService";
+import { ApiService } from "../../services/ApiService";
 export const processPriceData: Action = {
     name: "PROCESS_PRICE",
     similes: [
@@ -46,7 +45,7 @@ export const processPriceData: Action = {
                     template:tmp
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            if(callback){
+            if(callback && service.callbackInActions){
                 if(!resp || resp === ''){
                     callback({
                         text:`
@@ -70,7 +69,7 @@ export const processPriceData: Action = {
             service.is_action_executing['PROCESS_PRICE'] = false;
             return true;
         } catch (error) {
-            elizaLogger.error("Error in price analyse:", error);
+            logger.error("Error in price analyse:", error);
             if(callback){
                 callback({
                     text:`
