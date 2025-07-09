@@ -78,29 +78,27 @@ export const getOnChainData: Action = {
             const load_res2 = `service.loadTransactionData: ` + await service.loadTransactionData(true);
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){
-                let star_date: string, 
-                    end_date: string;
                 if(service.CRYPT_STAGE){
                     switch(service.CRYPT_STAGE){
                         case 'bull':
-                            star_date = bull_starting_date;
-                            end_date = bull_ending_date;
+                            service.start_day = bull_starting_date;
+                            service.end_day = bull_ending_date;
                             break;
                         case 'bear':
-                            star_date = bear_starting_date;
-                            end_date = bear_ending_date;
+                            service.start_day = bear_starting_date;
+                            service.end_day = bear_ending_date;
                             break;
                         case 'sideways':
-                            star_date = sideways_starting_date;
-                            end_date = sideways_ending_date;
+                            service.start_day = sideways_starting_date;
+                            service.end_day = sideways_ending_date;
                             break;
                     }
                 }else{
-                    star_date = starting_date;
-                    end_date = ending_date;
+                    service.start_day = starting_date;
+                    service.end_day = ending_date;
                 }
-                service.today_idx = service.price_data.findIndex(d => d.key === star_date);
-                service.end_day_idx = service.price_data.findIndex(d => d.key === end_date);
+                service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
+                service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
             }
             if (!service.project_initialized){
                 service.initProject();

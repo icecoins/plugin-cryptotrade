@@ -75,6 +75,7 @@ const managerMsgHandler = async ({
         await runtime.processActions(message, [_responseMessage], _state, callback);
       }
       service.today_idx += 1;
+      service.appendRecord();
     } while (service.today_idx <= service.end_day_idx && !service.abortAllTasks);
     logger.warn(`[Manager Handler] END at [${service.today_idx}] , [${service.end_day_idx}]`);
     return;

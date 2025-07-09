@@ -72,58 +72,14 @@ export const getNewsData: Action = {
                 callback({
                     text:`
                     Error in news fetch:
-                    
                     ${error.message}
                     `
                 });
-                return false;
             }
             return false;
         }
     },
     examples: [
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "What's the news of Bitcoin yesterday?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "I'll check the Bitcoin news for you right away.",
-                    action: "GET_NEWS",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "The news of  BTC market price are: [{date:{date}, title:{tiles1}, context:{context1}},.....]",
-                },
-            },
-        ],
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "Can you check news of ETH on 2025/04/03?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "I'll fetch the news of Ethereum on 2025/04/03 for you.",
-                    action: "GET_NEWS",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "The news of ETH price on 2025/04/03 are: [{date:{date}, title:{tiles1}, context:{context1}},.....]",
-                },
-            },
-        ],
     ] as ActionExample[][],
 } as Action;
 

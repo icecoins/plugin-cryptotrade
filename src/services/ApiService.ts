@@ -65,8 +65,8 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export interface Article{
-  id:number,
-  url:string,
+  // id:number,
+  // url:string,
   title:string,
   time:string,
   content:string,
@@ -117,6 +117,7 @@ export class ApiService extends Service {
         throw error;
     }
   }
+
   async postNewsAPI(_chain: string, _date: string){
         try {
         const response = await postData('getNewsData', {chain: _chain, date: _date});
@@ -151,6 +152,8 @@ export class ApiService extends Service {
   public last_net_worth:number;
   public starting_price:number;
 
+  public start_day:string;
+  public end_day:string;
   public today_idx:number;
   public end_day_idx:number;
   public project_initialized:boolean = false;
@@ -158,6 +161,8 @@ export class ApiService extends Service {
   public CRYPT_STARTING_DAY:string;
   public CRYPT_ENDING_DAY:string;
   public CRYPT_STAGE:string;
+
+  public dumpRecordPath:string;
 
   initConfigs(){
     if(process.env.CRYPT_STARTING_DAY){
@@ -194,6 +199,7 @@ export class ApiService extends Service {
     this.coin_held = (this.starting_net_worth - this.cash) / this.starting_price
     this.last_net_worth = this.starting_net_worth;
     this.project_initialized = true;
+    this.dumpRecordPath = `./data/local/record/${this.start_day}-${this.end_day}.json`;
   }
 
   initState() {
@@ -235,6 +241,10 @@ export class ApiService extends Service {
     // logger.error('STEP END, RECORD:\n', JSON.stringify(this.record));
     this.initData();
     this.initState();
+  }
+
+  public appendRecord(){
+    fs.appendFileSync(this.dumpRecordPath, JSON.stringify(this.record[this.record.length-1]) + ',\n');
   }
 
   public updateState(Executing: boolean, GET_PRICE: string, GET_NEWS: string, 
@@ -377,7 +387,15 @@ export class ApiService extends Service {
         for (const name of fileNames){
           let news_str = await this.readFileByAbsPath(path.join(dir, name));
           // news_str = [{id, url, title, content,...}, {}, ...]
-          let format_news_data:Article[] = JSON.parse(news_str);
+          let raw_news_data:Article[] = JSON.parse(news_str);
+          let format_news_data:Article[] = [];
+          for(let i = 0; i < raw_news_data.length; i++){
+            // Filter id, url, ...
+            const article:Article = JSON.parse(JSON.stringify({
+              title: raw_news_data[i].title, date:raw_news_data[i].time, content:raw_news_data[i].content
+            }));
+            format_news_data.push(article);
+          }
           // name.split('.')[0] = 'yyyy-mm-dd
           this.news_data.push({ date:name.split('.')[0], data: structuredClone(format_news_data)});
         }
@@ -386,6 +404,7 @@ export class ApiService extends Service {
       } 
       catch (error) {
         reject(error);
+        throw new Error(error);
       }
     });
   }
@@ -565,7 +584,7 @@ export class ApiService extends Service {
     }
   }
 
-  public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26'){
+  public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26', maxArticles:number = 3){
     let idx_news = this.news_data.findIndex(item => item.date === date);
     logger.error('API SERVICE getPromptOfNewsData: [' + idx_news + ']\n');
     if(-1 != idx_news && this.news_data[idx_news].data.length > 0){
@@ -581,12 +600,18 @@ export class ApiService extends Service {
         news_s += delim + `Write one concise paragraph to analyze the summary and estimate the market trend accordingly.`;
       }else{
         news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. You are required to analyze the following news articles:` + delim;
-        news_s += JSON.stringify(this.news_data[idx_news].data);
+        if(this.news_data[idx_news].data.length > maxArticles){
+          for(let i = 0; i < maxArticles; i++){
+            news_s += JSON.stringify(this.news_data[idx_news].data[i]);
+          }
+        }else{
+          news_s += JSON.stringify(this.news_data[idx_news].data);
+        }
         news_s += delim + `Write one concise paragraph to analyze the news and estimate the market trend accordingly.`;
       }
       return news_s;
     }else{
-      return 'FAILED TO FETCH NEWS DATA';
+      throw new Error('FAILED TO FETCH NEWS DATA');
     }
   }
 
@@ -675,7 +700,8 @@ Input article data:
     return trade_s;
   }
 
-  public async tryToCallLLMsWithoutFormat(prompt: string, parseAction:boolean = false, debug = true, maxTokens = 750, temperature = 0.7, contextSize = 16384) : Promise<string>{
+  public async tryToCallLLMsWithoutFormat(prompt: string, parseAction:boolean = false, debug = true, 
+    maxTokens = 1000, temperature = 0.7, contextSize = 16384) : Promise<string>{
     return new Promise<string>( async (resolve, reject) => {
       let response = 'LLM HAS NOT RESPONSE';
       for(var i = 0; i < LLM_retry_times; i++){
