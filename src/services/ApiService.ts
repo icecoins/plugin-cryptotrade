@@ -143,6 +143,7 @@ export class ApiService extends Service {
 
   public callbackInActions = true;
   public enableNewsSimplification = false;
+  public useTransactionData = false;
 
   public cash:number;
   public coin_held:number;
@@ -186,6 +187,13 @@ export class ApiService extends Service {
         this.enableNewsSimplification = true;
       }else{
         this.enableNewsSimplification = false;
+      }
+    }
+    if(process.env.CRYPT_USE_TRANSACTION){
+      if(process.env.CRYPT_USE_TRANSACTION === 'true'){
+        this.useTransactionData = true;
+      }else{
+        this.useTransactionData = false;
       }
     }
     logger.error(`Config init done:\nthis.CRYPT_STARTING_DAY: ${this.CRYPT_STARTING_DAY}\nthis.CRYPT_STAGE: ${this.CRYPT_STAGE}\nthis.callbackInActions: ${this.callbackInActions}\nthis.enableNewsSimplification: ${this.enableNewsSimplification}`);
@@ -390,9 +398,10 @@ export class ApiService extends Service {
           let raw_news_data:Article[] = JSON.parse(news_str);
           let format_news_data:Article[] = [];
           for(let i = 0; i < raw_news_data.length; i++){
-            // Filter id, url, ...
+            // Filter id, url, ...s
+            // logger.error(`Parse Article:\n\ttitle: ${raw_news_data[i].title}\n\tdate:raw_news_data[i].time`)
             const article:Article = JSON.parse(JSON.stringify({
-              title: raw_news_data[i].title, date:raw_news_data[i].time, content:raw_news_data[i].content
+              title: raw_news_data[i].title, time:raw_news_data[i].time, content:raw_news_data[i].content
             }));
             format_news_data.push(article);
           }
@@ -548,12 +557,36 @@ export class ApiService extends Service {
 
   public getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26', windowSize:number = 5){
     let idx_price = this.price_data.findIndex(item => item.key === date);
+    let price_s = "You are an " + chain + 
+      "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
+    if(!this.useTransactionData){
+      if(-1 != idx_price){
+        let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
+        for(; idx_price_start <= idx_price; idx_price_start++){
+          let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
+          let macd:number = this.price_data[idx_price_start].value['macd']
+          let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine']
+          let macd_signal = 'hold';
+          if (macd < macd_signal_line){
+            macd_signal = 'buy';
+          }
+          else if (macd > macd_signal_line){
+            macd_signal = 'sell';
+          }
+          data_str += `, MACD Signal: ${macd_signal}`;
+          data_str += ';\n';
+          price_s += data_str;
+        }
+        // Open price: 17446.36027, day: 2023-01-11, unique_addresses: 1274205, total_transactions: 6726228, total_value_transferred: 250059124.5, average_fee: 0.00055232, total_size_used: 2.13E+11, coinbase_transactions: 405;
+        price_s += delim + 'Write one concise paragraph to analyze the recent information and estimate the market trend accordingly.'
+        return price_s;
+      }
+      return null;
+    }
     let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
     if(-1 != idx_price && -1 != idx_transaction){
       let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
       let idx_transaction_start = idx_transaction - windowSize < 0 ? 0 : idx_transaction - windowSize;
-      let price_s = "You are an " + chain + 
-      "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
       for(; (idx_price_start <= idx_price) && (idx_transaction_start <= idx_transaction); 
             idx_price_start++, idx_transaction_start++){
         let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
@@ -571,7 +604,7 @@ export class ApiService extends Service {
         else if (macd > macd_signal_line){
           macd_signal = 'sell';
         }
-        data_str += `, macd_signal: ${macd_signal}`;
+        data_str += `, MACD signal: ${macd_signal}`;
         data_str += ';\n';
         price_s += data_str;
       }
@@ -736,7 +769,7 @@ Input article data:
         if(debug){
           logger.warn('[CryptoTrader] tryToCallLLMsWithoutFormat *** response ***\n', response);
         }
-        await sleep(1000);
+        // await sleep(1000);
         resolve(response);
       }
     });
