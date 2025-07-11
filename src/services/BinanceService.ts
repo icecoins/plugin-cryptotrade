@@ -1,5 +1,5 @@
 import { Service, IAgentRuntime, logger } from "@elizaos/core";
-import { CurrentAvgPrice, MainClient, SymbolPrice, Ticker24hrResponse } from 'binance';
+import { CurrentAvgPrice, MainClient, SymbolPrice, Ticker24hrResponse, TradingDayTickerFull, TradingDayTickerMini } from 'binance';
 export class BinanceService extends Service {
     static serviceType = 'binance';
     capabilityDescription =
@@ -66,13 +66,26 @@ export class BinanceService extends Service {
             }
         });
     }
+
+    async getRollingWindowTicker(coin_symbol:string = 'BTCUSDT', windowSize = 4){
+        return new Promise<TradingDayTickerFull[] | TradingDayTickerMini[]>(async (resolve, reject) =>{
+            try {
+                const data = await this.client.getRollingWindowTicker({symbol:coin_symbol, windowSize: windowSize + 'h', type:'FULL'});
+                // logger.error(`getRollingWindowTicker:\n${data}\n${JSON.stringify(data)}`);
+                resolve(data);
+            } catch (error) {
+                reject(error)
+            }
+        });
+    }
+
     async getDailyPrice(coin_symbol:string = 'BTCUSDT'){
         return new Promise<Ticker24hrResponse>(async (resolve, reject) =>{
             try {
                 if(!coin_symbol.includes('USDT')){
                     coin_symbol = coin_symbol.toUpperCase().concat('USDT');
                 }
-                const price = await this.client.get24hrChangeStatistics({symbol: coin_symbol, type: 'MINI'},);
+                const price = await this.client.get24hrChangeStatistics({symbol: coin_symbol, type: 'FULL'});
                 resolve(price);
             } catch (error) {
                 reject(error)

@@ -39,7 +39,7 @@ export const processPriceData: Action = {
             }
             service.is_action_executing['PROCESS_PRICE'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
-            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[service.today_idx].key)
+            let tmp = await service.getPromptOfOnChainData('BTC')
             const prompt = composePromptFromState({
                     state,
                     template:tmp

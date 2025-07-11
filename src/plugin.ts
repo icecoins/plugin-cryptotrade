@@ -33,7 +33,7 @@ const managerMsgHandler = async ({
   let args:string[] = null;
   if(message.content.text){
     args = message.content.text.split(',');
-    if(!args || args.length < 3 || !args[0].match('cryptotrade')){
+    if(!args || args.length < 3 || !args[0].match('crypto')){
       // cryptotrade, trade, callBinanceAPI
       await callback({
                     text:`Invalid args.\nIf you are trying to use plugin-cryptotrade for ElizaOS, please format your input text as:\n\ncryptotrade,1,0\n\nWhich means use_cryptotrade?, for_trade?, test_call_binance_API?\n`,
@@ -44,13 +44,13 @@ const managerMsgHandler = async ({
   if(!LLM_produce_actions){
     do {
       let actions:string[] = null;
-      if(args[1].match('1')){
+      if(args[1].match('1') || args[1].match('true')){
         actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
         if(service.enableNewsSimplification){
           actions.push('SUMMARIZE_NEWS');
         }
         actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);
-      }else if(args[2].match('1')){
+      }else if(args[2].match('1') || args[2].match('true')){
         actions = ["CALL_BINANCE_API"];
       }
       const _responseContent = {

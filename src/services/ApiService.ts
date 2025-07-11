@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import path from "path";
 import * as readline from 'readline';
 import { delim, EX_RATE, GAS_FEE, LLM_retry_times, STARTING_CASH_RATIO, starting_date, STARTING_NET_WORTH } from "../const/Const";
+import { BinanceService } from "./BinanceService";
+import { SymbolPrice, TradingDayTickerFull, TradingDayTickerMini } from "binance";
 
 
 export async function getData(path: string) : Promise<any>{
@@ -132,8 +134,13 @@ export class ApiService extends Service {
   public step_data:{} = {STEP:0};
   
   public is_action_executing = {};
+
   public price_data = [];
+  public price_data_custom = [];
+
   public transaction_data = [];
+  public transaction_data_custom = [];
+
   public news_data:RecordNewsData[] = [];
   public news_data_simplified = [];
   public record = [];
@@ -144,6 +151,8 @@ export class ApiService extends Service {
   public callbackInActions = true;
   public enableNewsSimplification = false;
   public useTransactionData = false;
+  public customTimeSlot:boolean = false;
+  public project_initialized:boolean = false;
 
   public cash:number;
   public coin_held:number;
@@ -157,7 +166,6 @@ export class ApiService extends Service {
   public end_day:string;
   public today_idx:number;
   public end_day_idx:number;
-  public project_initialized:boolean = false;
 
   public CRYPT_STARTING_DAY:string;
   public CRYPT_ENDING_DAY:string;
@@ -174,6 +182,13 @@ export class ApiService extends Service {
     }
     if(process.env.CRYPT_STAGE){
       this.CRYPT_STAGE = process.env.CRYPT_STAGE;
+    }
+    if(process.env.CRYPT_CUSTOM_TIME_SLOT){
+      if(process.env.CRYPT_CUSTOM_TIME_SLOT === 'true'){
+        this.customTimeSlot = true;
+      }else{
+        this.customTimeSlot = false;
+      }
     }
     if(process.env.CRYPT_CALLBACK_IN_ACTIONS){
       if(process.env.CRYPT_CALLBACK_IN_ACTIONS === 'true'){
@@ -427,18 +442,23 @@ export class ApiService extends Service {
       }
       let res = 'error';
       try {
-        let values;
+        let values:string;
         if(local){
-          res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true);
-          logger.error('loadPriceData END');
-          let result = this.calculateMACD();
-          for (let i=0; i<this.price_data.length; i++){
-            this.price_data[i].value['ema12'] = result.ema12[i];
-            this.price_data[i].value['ema26'] = result.ema26[i];
-            this.price_data[i].value['macd'] = result.macd[i];
-            this.price_data[i].value['signalLine'] = result.signalLine[i];
+          if(this.customTimeSlot){
+            res = await this.fetchOnChainDataFromBinance();
           }
-          logger.error('MACD DATA CALC END');
+          else{
+            res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true);
+            logger.error('loadPriceData END');
+            let result = this.calculateMACD();
+            for (let i=0; i<this.price_data.length; i++){
+              this.price_data[i].value['ema12'] = result.ema12[i];
+              this.price_data[i].value['ema26'] = result.ema26[i];
+              this.price_data[i].value['macd'] = result.macd[i];
+              this.price_data[i].value['signalLine'] = result.signalLine[i];
+            }
+            logger.error('MACD DATA CALC END');
+          }
         }else{
           values = await fetchFileFromWeb();
         }
@@ -452,7 +472,12 @@ export class ApiService extends Service {
 
   public calculateMACD() {
     //this.price_data.push({ key: data[0], value: values });
-    const openPrices = this.price_data.map(d => d.value['open']);
+    let openPrices: any[];
+    if(!this.customTimeSlot){
+      openPrices = this.price_data.map(d => d.value['open']);
+    }else{
+      openPrices = this.price_data_custom.map(d => d.value['open']);
+    }
     //logger.error('calculateMACD openPrices: ', openPrices);
     const ema12 = ewma(openPrices, 12);
     const ema26 = ewma(openPrices, 26);
@@ -555,17 +580,195 @@ export class ApiService extends Service {
     return response;
   }
 
-  public getPromptOfOnChainData(chain: string = 'BTC', date:string = '2024-09-26', windowSize:number = 5){
-    let idx_price = this.price_data.findIndex(item => item.key === date);
+  public async simplifyNewsData(chain: string = 'btc', date:string = this.step_data['DATE']){
+    /*
+    There are 1~5 articles selected everyday,
+    build prompt and simplify them with LLM in a loop.
+    */
+    let idx_news_set = this.news_data.findIndex(item => item.date === date);
+    logger.error('API SERVICE getPromptOfSimplifyNewsData: [' + idx_news_set + ']\n');
+    if(-1 != idx_news_set && this.news_data[idx_news_set].data.length > 0){
+      const simp_tmp = `
+You are a parsing agent for cryptocurrency news. Your goal is to extract and structure key factual information from each article so that it can be used as input by downstream generation agents.
+Input includes:
+- Title
+- Time
+- Full article text
+
+Instructions:
+- Do not write in full prose or natural language.
+- Extract core information points in a structured, atomic way.
+- Avoid summarizing style or commentary; focus only on facts.
+- Output should be short, less than 500 words.
+- Organize output in a consistent and machine-readable format (e.g., JSON or labeled bullet points).
+- Include fields such as: main events, impact, involved entities (optional: sentiment, domain).
+
+Output Format Example:
+{
+  "short_summary": "...",
+  "impact": "...",
+  "domain": "...",
+  "sentiment": "neutral",
+  "key_points": ["...", "..."],
+}
+
+Input article data:
+` + delim;
+      for (let i = 0; i < this.news_data[idx_news_set].data.length; i++){
+        // this.news_data[idx_news_set].data = [{title, time, content}, {...}, ...]
+        let simp_s = simp_tmp + JSON.stringify({
+          title:this.news_data[idx_news_set].data[i].title,
+          time:this.news_data[idx_news_set].data[i].time,
+          content:this.news_data[idx_news_set].data[i].content
+        });
+        simp_s += delim;
+        const resp = await this.tryToCallLLMsWithoutFormat(simp_s, false, false, /*maxTokens:*/200);
+        this.news_data[idx_news_set].data[i].content_simplified = resp;
+      }
+      return 'simplifyNewsData done, data record to this.news_data[idx_news_set]';
+    }else{
+      return 'FAILED TO FETCH NEWS DATA';
+    }
+  }
+
+  // YYYY-MM-DD-HH:mm:ss
+  public parseDateToString(date:Date = new Date()){
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}-${hours}:${minutes}:${seconds}`;
+  }
+
+  public getTimeBeforeHours(n: number, date:Date = new Date()): Date {
+    date.setHours(date.getHours() - n);
+    return date;
+  }
+  
+  public getTimeSlotBeforeHours(n: number, date:Date = new Date()): Date {
+    date.setHours(date.getHours() - n);
+    return structuredClone(date);
+  }
+
+  public async fetchOnChainDataFromBinance(coin_symbol = 'BTCUSDT', /* hours: */slot: 1 | 4 | 23 = 4){
+    return new Promise<string>(async (resolve, reject) => {
+      // if current data == null
+      const binanceService = this.runtime.getService(BinanceService.serviceType) as BinanceService;
+      const requestCount = Number(24/slot);
+      let timeSlot:Date[] = [];
+      // push current time as elem[0]
+      timeSlot.push(structuredClone(new Date()));
+      logger.error(`Date now: \n${timeSlot[0]}`);
+      for(let i = 1; i < requestCount; i++){
+        let tmp = this.getTimeSlotBeforeHours(slot, timeSlot[i-1]);
+        timeSlot.push(tmp);
+      }
+
+      // elem[0] = current price data
+      const t_cTickerData:SymbolPrice|SymbolPrice[] = await binanceService.getTickerPrice(coin_symbol);
+      const cTickerData:SymbolPrice = JSON.parse(JSON.stringify(t_cTickerData));
+
+      this.price_data_custom.push({
+        key: this.parseDateToString(timeSlot[0]), // current time
+        value: {open: cTickerData.price}
+      });
+
+      this.transaction_data_custom.push({
+        key:this.parseDateToString(timeSlot[0]),  // current time
+        value: {
+          CEX: 'Binance',
+          time: this.parseDateToString(timeSlot[0])
+        }
+      });
+
+      let tickerData: Promise<TradingDayTickerFull[] | TradingDayTickerMini[]> | { openPrice: any; }[];
+      let parsedTickerData:TradingDayTickerFull;
+      for(let i = 1; i < timeSlot.length; i++){
+        try{
+          // get data before 4,8,12,16,20 hours
+          tickerData = await binanceService.getRollingWindowTicker(coin_symbol, i * slot);
+          parsedTickerData = JSON.parse(JSON.stringify(tickerData));
+          logger.error(`Binance data:\n${JSON.stringify(parsedTickerData)}`);
+        }catch(error){
+          reject(error);
+        }
+        /**
+         TradingDayTickerFull {
+              symbol: string;
+              priceChange: string;
+              priceChangePercent: string;
+              weightedAvgPrice: string;
+              openPrice: string;
+              highPrice: string;
+              lowPrice: string;
+              lastPrice: string;
+              volume: string;
+              quoteVolume: string;
+              openTime: number;
+              closeTime: number;
+              firstId: number;
+              lastId: number;
+              count: number;
+          }
+        */
+        let tansaction_values = {
+          CEX: 'Binance',
+          time:this.parseDateToString(timeSlot[i]),
+          totalValueTransferred: parsedTickerData.quoteVolume, 
+          priceChange: parsedTickerData.priceChange,
+          priceChangePercent: parsedTickerData.priceChangePercent,
+          // transactionsCount: parsedTickerData.count
+        };
+
+        this.price_data_custom.push({
+          key: tansaction_values.time, 
+          value: {open: parsedTickerData.openPrice}
+        });
+
+        this.transaction_data_custom.push({
+          key:this.parseDateToString(timeSlot[i]), 
+          value: tansaction_values
+        });
+        // Don't exceed the frequency limit
+        await sleep(500);
+      }
+      let result = this.calculateMACD();
+      for (let i=0; i<this.price_data.length; i++){
+        this.price_data_custom[i].value['ema12'] = result.ema12[i];
+        this.price_data_custom[i].value['ema26'] = result.ema26[i];
+        this.price_data_custom[i].value['macd'] = result.macd[i];
+        this.price_data_custom[i].value['signalLine'] = result.signalLine[i];
+      }
+      logger.error(`this.price_data_custom:\n${JSON.stringify(this.price_data_custom)}\n`);
+      logger.error(`this.transaction_data_custom:\n${JSON.stringify(this.transaction_data_custom)}\n`);
+      resolve('OnChain data fetched from Binance.');
+    });
+  }
+
+  public getPromptOfOnChainData(chain: string = 'BTC', date:string = this.price_data[this.today_idx].key, windowSize:number = 5){
+    let price_data: any[];
+    let transaction_data: any[];
+    if(this.customTimeSlot){
+      price_data = this.price_data_custom;
+      transaction_data = this.transaction_data_custom;
+      // date = today
+      date = price_data[0].key;
+    }else{
+      price_data = this.price_data;
+      transaction_data = this.transaction_data;
+    }
+    let idx_price = price_data.findIndex((item: { key: string; }) => item.key === date);
     let price_s = "You are an " + chain + 
       "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
     if(!this.useTransactionData){
       if(-1 != idx_price){
         let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
         for(; idx_price_start <= idx_price; idx_price_start++){
-          let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
-          let macd:number = this.price_data[idx_price_start].value['macd']
-          let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine']
+          let data_str =  'Open price: ' + price_data[idx_price_start].value['open'];
+          let macd:number = price_data[idx_price_start].value['macd']
+          let macd_signal_line:number = price_data[idx_price_start].value['signalLine']
           let macd_signal = 'hold';
           if (macd < macd_signal_line){
             macd_signal = 'buy';
@@ -583,20 +786,20 @@ export class ApiService extends Service {
       }
       return null;
     }
-    let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
+    let idx_transaction = transaction_data.findIndex(item => item.key === date);
     if(-1 != idx_price && -1 != idx_transaction){
       let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
       let idx_transaction_start = idx_transaction - windowSize < 0 ? 0 : idx_transaction - windowSize;
       for(; (idx_price_start <= idx_price) && (idx_transaction_start <= idx_transaction); 
             idx_price_start++, idx_transaction_start++){
-        let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
-        let transaction_value_set = this.transaction_data[idx_transaction_start].value;
+        let data_str =  'Open price: ' + price_data[idx_price_start].value['open'];
+        let transaction_value_set = transaction_data[idx_transaction_start].value;
         let transaction_labels = Object.keys(transaction_value_set);
         for (const label of transaction_labels){
           data_str += `, ${label}: ${transaction_value_set[label]}`; 
         }
-        let macd:number = this.price_data[idx_price_start].value['macd']
-        let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine']
+        let macd:number = price_data[idx_price_start].value['macd'];
+        let macd_signal_line:number = price_data[idx_price_start].value['signalLine'];
         let macd_signal = 'hold';
         if (macd < macd_signal_line){
           macd_signal = 'buy';
@@ -648,56 +851,6 @@ export class ApiService extends Service {
     }
   }
 
-  public async simplifyNewsData(chain: string = 'btc', date:string = this.step_data['DATE']){
-    /*
-    There are 1~5 articles selected everyday,
-    build prompt and simplify them with LLM in a loop.
-    */
-    let idx_news_set = this.news_data.findIndex(item => item.date === date);
-    logger.error('API SERVICE getPromptOfSimplifyNewsData: [' + idx_news_set + ']\n');
-    if(-1 != idx_news_set && this.news_data[idx_news_set].data.length > 0){
-      const simp_tmp = `
-You are a parsing agent for cryptocurrency news. Your goal is to extract and structure key factual information from each article so that it can be used as input by downstream generation agents.
-Input includes:
-- Title
-- Time
-- Full article text
-
-Instructions:
-- Do not write in full prose or natural language.
-- Extract core information points in a structured, atomic way.
-- Avoid summarizing style or commentary; focus only on facts.
-- Output should be short, less than 500 words.
-- Organize output in a consistent and machine-readable format (e.g., JSON or labeled bullet points).
-- Include fields such as: main events, impact, involved entities (optional: sentiment, domain).
-
-Output Format Example:
-{
-  "short_summary": "...",
-  "impact": "...",
-  "domain": "...",
-  "sentiment": "neutral",
-  "key_points": ["...", "..."],
-}
-
-Input article data:
-` + delim;
-      for (let i = 0; i < this.news_data[idx_news_set].data.length; i++){
-        // this.news_data[idx_news_set].data = [{title, time, content}, {...}, ...]
-        let simp_s = simp_tmp + JSON.stringify({
-          title:this.news_data[idx_news_set].data[i].title,
-          time:this.news_data[idx_news_set].data[i].time,
-          content:this.news_data[idx_news_set].data[i].content
-        });
-        simp_s += delim;
-        const resp = await this.tryToCallLLMsWithoutFormat(simp_s, false, false, /*maxTokens:*/200);
-        this.news_data[idx_news_set].data[i].content_simplified = resp;
-      }
-      return 'simplifyNewsData done, data record to this.news_data[idx_news_set]';
-    }else{
-      return 'FAILED TO FETCH NEWS DATA';
-    }
-  }
 
   public getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 5){
     const record_len = this.record.length;
