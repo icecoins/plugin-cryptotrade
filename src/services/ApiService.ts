@@ -136,10 +136,7 @@ export class ApiService extends Service {
   public is_action_executing = {};
 
   public price_data = [];
-  public price_data_custom = [];
-
   public transaction_data = [];
-  public transaction_data_custom = [];
 
   public news_data:RecordNewsData[] = [];
   public news_data_simplified = [];
@@ -308,7 +305,9 @@ export class ApiService extends Service {
       rl.on('line', (line) => {
         if(!firstLine){
           let data = line.split(','); // ...,2781,42569.7614,43243.16818,41879.18999,...
-          data[0] = data[0].substring(0,10) // 2024-02-01
+          if (!this.customTimeSlot) {
+            data[0] = data[0].substring(0, 10);
+          }
           let values: Record<string, any> = {}; // day:xx, unique_addresses:xxx, ...
           for(let i = 0; i < labels.length; i++){
             if(!('open' === labels[i])){
@@ -369,7 +368,11 @@ export class ApiService extends Service {
       try {
         let values = {};
         if(local){
-          res = await this.readLocalCsvFile('./data/local/bitcoin_transaction_statistics.csv', 'transaction', false);
+          if (this.customTimeSlot) {
+            res = await this.readLocalCsvFile("./data/local/binance/bitcoin_transaction_statistics.csv", "transaction", false);
+          } else {
+            res = await this.readLocalCsvFile("./data/local/bitcoin_transaction_statistics.csv", "transaction", false);
+          }
           logger.error('loadTransactionData END');
         }else{
           values = await fetchFileFromWeb();
@@ -386,7 +389,7 @@ export class ApiService extends Service {
   public async readFileByAbsPath(path:string, local: boolean = true): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
-        const data = await fs.readFileSync(path, 'utf-8');
+        const data = fs.readFileSync(path, 'utf-8');
         resolve(data);
       } 
       catch (error) {
@@ -443,22 +446,32 @@ export class ApiService extends Service {
       let res = 'error';
       try {
         let values:string;
+        let path:string;
         if(local){
-          if(this.customTimeSlot){
-            res = await this.fetchOnChainDataFromBinance();
+          if (this.customTimeSlot) {
+            if(this.useTransactionData){
+                const err = 'Error: CRYPT_CUSTOM_TIME_SLOT and CRYPT_USE_TRANSACTION can not be true at the same time.\nThe action of fetch current news data has not implemented yet.';
+                reject(err);
+                throw new Error(err);
+            }
+            if (!fs.existsSync("./data/local/binance/")) {
+              fs.mkdirSync("./data/local/binance/");
+            }
+            await this.fetchOnChainDataFromBinance();
+            path = "./data/local/binance/bitcoin_daily_price.csv";
+          } else {
+            path = "./data/local/bitcoin_daily_price.csv";
           }
-          else{
-            res = await this.readLocalCsvFile('./data/local/bitcoin_daily_price.csv', 'price', true);
-            logger.error('loadPriceData END');
-            let result = this.calculateMACD();
-            for (let i=0; i<this.price_data.length; i++){
+          res = await this.readLocalCsvFile(path, 'price', true);
+          logger.error('loadPriceData END');
+          let result = this.calculateMACD();
+          for (let i=0; i<this.price_data.length; i++){
               this.price_data[i].value['ema12'] = result.ema12[i];
               this.price_data[i].value['ema26'] = result.ema26[i];
               this.price_data[i].value['macd'] = result.macd[i];
               this.price_data[i].value['signalLine'] = result.signalLine[i];
-            }
-            logger.error('MACD DATA CALC END');
           }
+          logger.error('MACD DATA CALC END');
         }else{
           values = await fetchFileFromWeb();
         }
@@ -472,12 +485,7 @@ export class ApiService extends Service {
 
   public calculateMACD() {
     //this.price_data.push({ key: data[0], value: values });
-    let openPrices: any[];
-    if(!this.customTimeSlot){
-      openPrices = this.price_data.map(d => d.value['open']);
-    }else{
-      openPrices = this.price_data_custom.map(d => d.value['open']);
-    }
+    let openPrices = this.price_data.map(d => d.value['open']);
     //logger.error('calculateMACD openPrices: ', openPrices);
     const ema12 = ewma(openPrices, 12);
     const ema26 = ewma(openPrices, 26);
@@ -648,12 +656,17 @@ Input article data:
   }
   
   public getTimeSlotBeforeHours(n: number, date:Date = new Date()): Date {
+    date = structuredClone(date);
     date.setHours(date.getHours() - n);
-    return structuredClone(date);
+    return date;
   }
 
   public async fetchOnChainDataFromBinance(coin_symbol = 'BTCUSDT', /* hours: */slot: 1 | 4 | 23 = 4){
     return new Promise<string>(async (resolve, reject) => {
+      if (fs.existsSync("./data/local/binance/bitcoin_daily_price.csv") || fs.existsSync("./data/local/binance/bitcoin_transaction_statistics.csv")) {
+        logger.error("Data has fetched, skip");
+        resolve("Data has fetched, skip");
+      }
       // if current data == null
       const binanceService = this.runtime.getService(BinanceService.serviceType) as BinanceService;
       const requestCount = Number(24/slot);
@@ -669,106 +682,61 @@ Input article data:
       // elem[0] = current price data
       const t_cTickerData:SymbolPrice|SymbolPrice[] = await binanceService.getTickerPrice(coin_symbol);
       const cTickerData:SymbolPrice = JSON.parse(JSON.stringify(t_cTickerData));
+      const file_price = fs.openSync("./data/local/binance/bitcoin_daily_price.csv", "w");
+      const file_transaction = fs.openSync("./data/local/binance/bitcoin_transaction_statistics.csv", "w");
+      let tickerData;
+      let parsedTickerData;
+      let transactionRawWindowData = [];
+      transactionRawWindowData.push({});
 
-      this.price_data_custom.push({
-        key: this.parseDateToString(timeSlot[0]), // current time
-        value: {open: cTickerData.price}
-      });
-
-      this.transaction_data_custom.push({
-        key:this.parseDateToString(timeSlot[0]),  // current time
-        value: {
-          CEX: 'Binance',
-          time: this.parseDateToString(timeSlot[0])
-        }
-      });
-
-      let tickerData: Promise<TradingDayTickerFull[] | TradingDayTickerMini[]> | { openPrice: any; }[];
-      let parsedTickerData:TradingDayTickerFull;
-      for(let i = 1; i < timeSlot.length; i++){
-        try{
-          // get data before 4,8,12,16,20 hours
+      logger.error(`Date now2 : \n${timeSlot[0]}`);
+      fs.writeSync(file_price, `time,open\n${this.parseDateToString(timeSlot[0])},${cTickerData.price}\n`);
+      fs.writeSync(file_transaction, `time,CEX,totalValueTransferred,priceChange,priceChangePercent,transactionsCount\n${this.parseDateToString(timeSlot[0])},Binance,NO_DATA,NO_DATA,NO_DATA,NO_DATA\n`);
+            for (let i = 1; i < timeSlot.length; i++) {
+        try {
           tickerData = await binanceService.getRollingWindowTicker(coin_symbol, i * slot);
           parsedTickerData = JSON.parse(JSON.stringify(tickerData));
-          logger.error(`Binance data:\n${JSON.stringify(parsedTickerData)}`);
-        }catch(error){
+        } catch (error) {
           reject(error);
         }
-        /**
-         TradingDayTickerFull {
-              symbol: string;
-              priceChange: string;
-              priceChangePercent: string;
-              weightedAvgPrice: string;
-              openPrice: string;
-              highPrice: string;
-              lowPrice: string;
-              lastPrice: string;
-              volume: string;
-              quoteVolume: string;
-              openTime: number;
-              closeTime: number;
-              firstId: number;
-              lastId: number;
-              count: number;
-          }
-        */
-        let tansaction_values = {
-          CEX: 'Binance',
-          time:this.parseDateToString(timeSlot[i]),
-          totalValueTransferred: parsedTickerData.quoteVolume, 
+        const time = this.parseDateToString(timeSlot[i]);
+        let tansactionWindowValues = {
+          totalValueTransferred: parsedTickerData.quoteVolume,
           priceChange: parsedTickerData.priceChange,
           priceChangePercent: parsedTickerData.priceChangePercent,
-          // transactionsCount: parsedTickerData.count
+          transactionsCount: parsedTickerData.count
         };
-
-        this.price_data_custom.push({
-          key: tansaction_values.time, 
-          value: {open: parsedTickerData.openPrice}
-        });
-
-        this.transaction_data_custom.push({
-          key:this.parseDateToString(timeSlot[i]), 
-          value: tansaction_values
-        });
-        // Don't exceed the frequency limit
+        let tansactionValues = {
+          CEX: "Binance",
+          totalValueTransferred: i > 1 ? Number(parsedTickerData.quoteVolume) - Number(transactionRawWindowData[i - 1].totalValueTransferred) : Number(parsedTickerData.quoteVolume),
+          priceChange: i > 1 ? Number(parsedTickerData.priceChange) - Number(transactionRawWindowData[i - 1].priceChange) : Number(parsedTickerData.priceChange),
+          priceChangePercent: i > 1 ? Number(parsedTickerData.priceChangePercent) - Number(transactionRawWindowData[i - 1].priceChangePercent) : Number(parsedTickerData.priceChangePercent),
+          transactionsCount: i > 1 ? parsedTickerData.count - transactionRawWindowData[i - 1].transactionsCount : parsedTickerData.count
+        };
+        transactionRawWindowData.push(structuredClone(tansactionWindowValues));
+        fs.writeSync(file_price, `${time},${parsedTickerData.openPrice}\n`);
+        fs.writeSync(file_transaction, `${time},${tansactionValues.CEX},${tansactionValues.totalValueTransferred},${tansactionValues.priceChange},${tansactionValues.priceChangePercent},${tansactionValues.transactionsCount}\n`);
         await sleep(500);
       }
-      let result = this.calculateMACD();
-      for (let i=0; i<this.price_data.length; i++){
-        this.price_data_custom[i].value['ema12'] = result.ema12[i];
-        this.price_data_custom[i].value['ema26'] = result.ema26[i];
-        this.price_data_custom[i].value['macd'] = result.macd[i];
-        this.price_data_custom[i].value['signalLine'] = result.signalLine[i];
-      }
-      logger.error(`this.price_data_custom:\n${JSON.stringify(this.price_data_custom)}\n`);
-      logger.error(`this.transaction_data_custom:\n${JSON.stringify(this.transaction_data_custom)}\n`);
-      resolve('OnChain data fetched from Binance.');
+      fs.closeSync(file_price);
+      fs.closeSync(file_transaction);
+      logger.error(`transactionRawWindowData:\n${JSON.stringify(transactionRawWindowData)}\n`);
+      // throw new Error("stop");
+      resolve("OnChain data fetched from Binance.");
     });
   }
 
-  public getPromptOfOnChainData(chain: string = 'BTC', date:string = this.price_data[this.today_idx].key, windowSize:number = 5){
-    let price_data: any[];
-    let transaction_data: any[];
-    if(this.customTimeSlot){
-      price_data = this.price_data_custom;
-      transaction_data = this.transaction_data_custom;
-      // date = today
-      date = price_data[0].key;
-    }else{
-      price_data = this.price_data;
-      transaction_data = this.transaction_data;
-    }
-    let idx_price = price_data.findIndex((item: { key: string; }) => item.key === date);
+  public getPromptOfOnChainData(chain: string = 'BTC', date:string = '', windowSize:number = 5){
+    let idx_price = this.price_data.findIndex((item: { key: string; }) => item.key === date);
     let price_s = "You are an " + chain + 
       "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
     if(!this.useTransactionData){
       if(-1 != idx_price){
         let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
         for(; idx_price_start <= idx_price; idx_price_start++){
-          let data_str =  'Open price: ' + price_data[idx_price_start].value['open'];
-          let macd:number = price_data[idx_price_start].value['macd']
-          let macd_signal_line:number = price_data[idx_price_start].value['signalLine']
+          let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
+          let macd:number = this.price_data[idx_price_start].value['macd']
+          let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine']
           let macd_signal = 'hold';
           if (macd < macd_signal_line){
             macd_signal = 'buy';
@@ -786,20 +754,20 @@ Input article data:
       }
       return null;
     }
-    let idx_transaction = transaction_data.findIndex(item => item.key === date);
+    let idx_transaction = this.transaction_data.findIndex(item => item.key === date);
     if(-1 != idx_price && -1 != idx_transaction){
       let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
       let idx_transaction_start = idx_transaction - windowSize < 0 ? 0 : idx_transaction - windowSize;
       for(; (idx_price_start <= idx_price) && (idx_transaction_start <= idx_transaction); 
             idx_price_start++, idx_transaction_start++){
-        let data_str =  'Open price: ' + price_data[idx_price_start].value['open'];
-        let transaction_value_set = transaction_data[idx_transaction_start].value;
+        let data_str =  'Open price: ' + this.price_data[idx_price_start].value['open'];
+        let transaction_value_set = this.transaction_data[idx_transaction_start].value;
         let transaction_labels = Object.keys(transaction_value_set);
         for (const label of transaction_labels){
           data_str += `, ${label}: ${transaction_value_set[label]}`; 
         }
-        let macd:number = price_data[idx_price_start].value['macd'];
-        let macd_signal_line:number = price_data[idx_price_start].value['signalLine'];
+        let macd:number = this.price_data[idx_price_start].value['macd'];
+        let macd_signal_line:number = this.price_data[idx_price_start].value['signalLine'];
         let macd_signal = 'hold';
         if (macd < macd_signal_line){
           macd_signal = 'buy';
@@ -850,7 +818,6 @@ Input article data:
       throw new Error('FAILED TO FETCH NEWS DATA');
     }
   }
-
 
   public getPromptOfReflectHistory(chain: string = 'btc', windowSize:number = 5){
     const record_len = this.record.length;

@@ -80,27 +80,35 @@ export const getOnChainData: Action = {
             }
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){
-                if(service.CRYPT_STAGE){
-                    switch(service.CRYPT_STAGE){
-                        case 'bull':
-                            service.start_day = bull_starting_date;
-                            service.end_day = bull_ending_date;
-                            break;
-                        case 'bear':
-                            service.start_day = bear_starting_date;
-                            service.end_day = bear_ending_date;
-                            break;
-                        case 'sideways':
-                            service.start_day = sideways_starting_date;
-                            service.end_day = sideways_ending_date;
-                            break;
-                    }
-                }else{
-                    service.start_day = starting_date;
-                    service.end_day = ending_date;
+                if(service.customTimeSlot){
+                    service.today_idx = service.price_data.length - 2;
+                    service.end_day_idx = service.price_data.length;
+                    service.start_day = service.price_data[service.today_idx].key;
+                    service.end_day = service.price_data[service.end_day_idx].key;
                 }
-                service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
-                service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
+                else{
+                    if(service.CRYPT_STAGE){
+                        switch(service.CRYPT_STAGE){
+                            case 'bull':
+                                service.start_day = bull_starting_date;
+                                service.end_day = bull_ending_date;
+                                break;
+                            case 'bear':
+                                service.start_day = bear_starting_date;
+                                service.end_day = bear_ending_date;
+                                break;
+                            case 'sideways':
+                                service.start_day = sideways_starting_date;
+                                service.end_day = sideways_ending_date;
+                                break;
+                        }
+                    }else{
+                        service.start_day = starting_date;
+                        service.end_day = ending_date;
+                    }
+                    service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
+                    service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
+                }
             }
             if (!service.project_initialized){
                 service.initProject();
