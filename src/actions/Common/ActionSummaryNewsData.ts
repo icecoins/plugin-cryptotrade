@@ -28,14 +28,14 @@ export const simplifyNewsData: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing['SIMPLIFY_NEWS']){
+            if(service.is_action_executing!['SIMPLIFY_NEWS']){
                 logger.error('***** ACTION SIMPLIFY_NEWS IS RUNNING, SKIP ACTION  ***** \n');
-                return false;
+                return;
             }
-            service.is_action_executing['SIMPLIFY_NEWS'] = true;
+            service.is_action_executing!['SIMPLIFY_NEWS'] = true;
             logger.error(`[CRYPTOTRADE] SIMPLIFY_NEWS START\n`);
             let resp = await service.simplifyNewsData();
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
@@ -45,26 +45,26 @@ export const simplifyNewsData: Action = {
                     text:`Here is the reponse of Raw News Simplify Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_state['SIMPLIFY_NEWS'] = 'DONE';
+            service.step_state!['SIMPLIFY_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_SIMPLIFY_NEWS DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_NEWS'});
             logger.warn('***** ACTION SIMPLIFY_NEWS DONE *****')
-            service.is_action_executing['SIMPLIFY_NEWS'] = false;
-            return true;
+            service.is_action_executing!['SIMPLIFY_NEWS'] = false;
+            return;
         } catch (error) {
             logger.error("Error in news analyse:", error);
             if(callback){
                 callback({
                     text:`
                     Error in news simplify:
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
+                return;
             }
-            return false;
+            return;
         }
     },
     examples: [

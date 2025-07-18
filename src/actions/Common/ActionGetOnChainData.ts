@@ -68,11 +68,11 @@ export const getOnChainData: Action = {
     ): Promise<unknown> => {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing['GET_PRICE']){
+            if(service.is_action_executing!['GET_PRICE']){
                //  logger.error('***** ACTION GET_PRICE IS RUNNING, SKIP ACTION  ***** \n');
                 return false;
             }
-            service.is_action_executing['GET_PRICE'] = true;
+            service.is_action_executing!['GET_PRICE'] = true;
             // logger.error('***** ACTION GET_PRICE START ***** \n');
             await service.loadPriceData();
             if(service.useTransactionData){
@@ -80,32 +80,40 @@ export const getOnChainData: Action = {
             }
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){
-                if(service.CRYPT_STAGE){
-                    switch(service.CRYPT_STAGE){
-                        case 'bull':
-                            service.start_day = bull_starting_date;
-                            service.end_day = bull_ending_date;
-                            break;
-                        case 'bear':
-                            service.start_day = bear_starting_date;
-                            service.end_day = bear_ending_date;
-                            break;
-                        case 'sideways':
-                            service.start_day = sideways_starting_date;
-                            service.end_day = sideways_ending_date;
-                            break;
-                    }
-                }else{
-                    service.start_day = starting_date;
-                    service.end_day = ending_date;
+                if(service.customTimeSlot){
+                    service.today_idx = service.price_data.length - 2;
+                    service.end_day_idx = service.price_data.length;
+                    service.start_day = service.price_data[service.today_idx].key;
+                    service.end_day = service.price_data[service.end_day_idx].key;
                 }
-                service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
-                service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
+                else{
+                    if(service.CRYPT_STAGE){
+                        switch(service.CRYPT_STAGE){
+                            case 'bull':
+                                service.start_day = bull_starting_date;
+                                service.end_day = bull_ending_date;
+                                break;
+                            case 'bear':
+                                service.start_day = bear_starting_date;
+                                service.end_day = bear_ending_date;
+                                break;
+                            case 'sideways':
+                                service.start_day = sideways_starting_date;
+                                service.end_day = sideways_ending_date;
+                                break;
+                        }
+                    }else{
+                        service.start_day = starting_date;
+                        service.end_day = ending_date;
+                    }
+                    service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
+                    service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
+                }
             }
             if (!service.project_initialized){
                 service.initProject();
             }
-            service.step_data["DATE"] = service.price_data[service.today_idx].key;
+            service.step_data!["DATE"] = service.price_data[service.today_idx].key;
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             logger.warn('***** GET_PRICE DATA END ***** \n');
             const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
@@ -120,63 +128,20 @@ export const getOnChainData: Action = {
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message: message, source: 'CryptoTrade_Action_GET_PRICE'});
             logger.warn('***** ACTION GET_PRICE DONE *****')
-            service.step_state['GET_PRICE'] = 'DONE';
-            service.step_state['Executing'] = true;
-            service.is_action_executing['GET_PRICE'] = false;
-            return true;
+            service.step_state!['GET_PRICE'] = 'DONE';
+            service.step_state!['Executing'] = true;
+            service.is_action_executing!['GET_PRICE'] = false;
+            return;
         } catch (error) {
             logger.error("Error in price check:", error);
             if(callback){
                 callback({
-                    text:`Error in price check: ${error.message} `
+                    text:`Error in price check: ${error} `
                 });
-                return false;
+                return;
             }
-            return false;
+            return;
         }
     },
-    examples: [
-        [
-            {
-                name: "{{user1}}",
-                content: {
-                    text: "What's the market price of Bitcoin yesterday?",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "I'll check the Bitcoin market price for you right away.",
-                    action: "GET_PRICE",
-                },
-            },
-            {
-                name: "{{agent}}",
-                content: {
-                    text: "The current BTC market price is {date}, open: {open price} USDT, close: {close price}} USDT",
-                },
-            },
-        ],
-        [
-            {
-                user: "{{user1}}",
-                content: {
-                    text: "Can you check ETH price on 2025/04/03?",
-                },
-            },
-            {
-                user: "{{agent}}",
-                content: {
-                    text: "I'll fetch the Ethereum price on 2025/04/03 for you.",
-                    action: "GET_PRICE",
-                },
-            },
-            {
-                user: "{{agent}}",
-                content: {
-                    text: "The ETH price on 2025/04/03 is {date}, open: {open price} USDT, close: {close price}} USDT",
-                },
-            },
-        ],
-    ] as ActionExample[][],
+    examples: [],
 } as Action;

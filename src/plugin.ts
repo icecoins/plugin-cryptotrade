@@ -30,10 +30,10 @@ const managerMsgHandler = async ({
 }: MessageReceivedHandlerParams): Promise<void> => {
   let _state = await runtime.composeState(message);
   let service = runtime.getService(ApiService.serviceType) as ApiService;
-  let args:string[] = null;
+  let args:string[];
   if(message.content.text){
     args = message.content.text.split(',');
-    if(!args || args.length < 3 || !args[0].match('cryptotrade')){
+    if(!args || args.length < 3 || !(args[0] === 'crypto')){
       // cryptotrade, trade, callBinanceAPI
       await callback({
                     text:`Invalid args.\nIf you are trying to use plugin-cryptotrade for ElizaOS, please format your input text as:\n\ncryptotrade,1,0\n\nWhich means use_cryptotrade?, for_trade?, test_call_binance_API?\n`,
@@ -43,14 +43,14 @@ const managerMsgHandler = async ({
   }
   if(!LLM_produce_actions){
     do {
-      let actions:string[] = null;
-      if(args[1].match('1')){
+      let actions:string[] = [];
+      if(args![1] === '1' || args![1] === 'true'){
         actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
         if(service.enableNewsSimplification){
           actions.push('SUMMARIZE_NEWS');
         }
         actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);
-      }else if(args[2].match('1')){
+      }else if(args![2] === '1' || args![2] === 'true'){
         actions = ["CALL_BINANCE_API"];
       }
       const _responseContent = {
@@ -76,7 +76,7 @@ const managerMsgHandler = async ({
       }
       service.today_idx += 1;
       service.appendRecord();
-    } while (service.today_idx <= service.end_day_idx && !service.abortAllTasks);
+    } while (service.today_idx <= service.end_day_idx! && !service.abortAllTasks);
     logger.warn(`[Manager Handler] END at [${service.today_idx}] , [${service.end_day_idx}]`);
     return;
   }
@@ -94,7 +94,7 @@ const managerMsgHandler = async ({
   var userMsgTmp = '';
   var prompt = '';
   // Message from CryptoTrade Actions, take next actions
-  if(message && message.content && message.content.text.startsWith('CryptoTrade_Action')){
+  if(message && message.content && message.content.text!.startsWith('CryptoTrade_Action')){
     prompt = composePromptFromState({
         state,
         template: manageTemplate_Intro + manageTemplate_Example + 
@@ -175,7 +175,6 @@ var events:PluginEvents = {
         logger.warn('No callback provided for message');
         return;
       }
-      // logger.warn('payload.runtime.character.name: [' + payload.runtime.character.name + ']');
       await managerMsgHandler({
         runtime: payload.runtime,
         message: payload.message,
@@ -192,7 +191,7 @@ var events:PluginEvents = {
         await managerMsgHandler({
           runtime: payload.runtime,
           message: payload.message,
-          callback: payload.callback,
+          callback: payload.callback!,
           onComplete: payload.onComplete,
         });
       }
@@ -249,7 +248,5 @@ export const cryptoPlugin: Plugin = {
   providers: [],
   events:events
 };
-
-
 
 export default cryptoPlugin;

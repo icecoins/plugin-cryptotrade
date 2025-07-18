@@ -30,14 +30,14 @@ export const processRelect: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing['PROCESS_REFLECT']){
+            if(service.is_action_executing!['PROCESS_REFLECT']){
                 logger.error('***** ACTION PROCESS_REFLECT IS RUNNING, SKIP ACTION  ***** \n');
-                return false;
+                return;
             }
-            service.is_action_executing['PROCESS_REFLECT'] = true;
+            service.is_action_executing!['PROCESS_REFLECT'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_REFLECT START\n`);
             let tmp = await service.getPromptOfReflectHistory('BTC');
             const prompt = composePromptFromState({
@@ -51,27 +51,26 @@ export const processRelect: Action = {
                     text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_data['ANALYSIS_REPORT_REFLECT'] = resp;
-            service.step_state['PROCESS_REFLET'] = 'DONE';
+            service.step_data!['ANALYSIS_REPORT_REFLECT'] = resp;
+            service.step_state!['PROCESS_REFLET'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_REFLET'});
             logger.warn('***** ACTION PROCESS_REFLET DONE *****');
-            service.is_action_executing['PROCESS_REFLECT'] = false;
-            return true;
+            service.is_action_executing!['PROCESS_REFLECT'] = false;
+            return;
         } catch (error) {
             logger.error("Error in reflect action:", error);
             if(callback){
                 callback({
                     text:`
                     Error in reflect:
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
             }
-            return false;
+            return;
         }
     },
     examples: [

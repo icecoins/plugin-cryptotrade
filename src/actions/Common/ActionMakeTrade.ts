@@ -30,7 +30,7 @@ export const makeTrade: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
             let tmp = await service.getPromptOfMakeTrade('BTC');
@@ -39,9 +39,9 @@ export const makeTrade: Action = {
                     template:tmp
             });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt, true, true);
-            service.step_data['TRADE_REASON'] = resp;
-            if(service.step_data['TRADE_ACTION_VALUE'] === -999){
-                service.step_data['TRADE_ACTION_VALUE'] = 0;
+            service.step_data!['TRADE_REASON'] = resp;
+            if(service.step_data!['TRADE_ACTION_VALUE'] === -999){
+                service.step_data!['TRADE_ACTION_VALUE'] = 0;
             }
             await service.executeTrade();
             await service.calculateROI();
@@ -51,7 +51,7 @@ export const makeTrade: Action = {
                     thought:
                     `${resp}`,
                     text:
-                    `Here is the action of Trade Agent:\n\t\tAction: ${service.step_data['TRADE_ACTION']} \n\t\tValue: ${service.step_data['TRADE_ACTION_VALUE']}\n\t\t\nDaily Return: ${service.step_data['TODAY_ROI'] * 100} %\n\t\t\nTotal Return: ${service.total_roi * 100} %`,
+                    `Here is the action of Trade Agent:\n\t\tAction: ${service.step_data!['TRADE_ACTION']} \n\t\tValue: ${service.step_data!['TRADE_ACTION_VALUE']}\n\t\t\nDaily Return: ${service.step_data!['TODAY_ROI'] * 100} %\n\t\t\nTotal Return: ${service.total_roi! * 100} %`,
                 });
             }
             var message: Memory;
@@ -59,22 +59,22 @@ export const makeTrade: Action = {
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_MAKE_TRADE'});
             logger.warn('***** ACTION MAKE_TRADE DONE *****')
-            service.step_state['MAKE_TRADE'] = 'DONE';
-            service.step_state['Executing'] = false;
+            service.step_state!['MAKE_TRADE'] = 'DONE';
+            service.step_state!['Executing'] = false;
             service.stepEnd();
-            return true;
+            return;
         } catch (error) {
             logger.error("Error in MAKE_TRADE:", error);
             if(callback){
                 callback({
                     text:`
                     Error in MAKE_TRADE:
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
+                return;
             }
-            return false;
+            return;
         }
     },
     examples: [

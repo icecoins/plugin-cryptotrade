@@ -30,16 +30,16 @@ export const processPriceData: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing['PROCESS_PRICE']){
+            if(service.is_action_executing!['PROCESS_PRICE']){
                 logger.error('***** ACTION PROCESS_PRICE IS RUNNING, SKIP ACTION  ***** \n');
-                return false;
+                return;
             }
-            service.is_action_executing['PROCESS_PRICE'] = true;
+            service.is_action_executing!['PROCESS_PRICE'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_PRICE START\n`);
-            let tmp = await service.getPromptOfOnChainData('BTC', service.price_data[service.today_idx].key)
+            let tmp = service.getPromptOfOnChainData('BTC');
             const prompt = composePromptFromState({
                     state,
                     template:tmp
@@ -59,15 +59,15 @@ export const processPriceData: Action = {
                     text:`Here is the reponse of On-Chain Data Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_data['ANALYSIS_REPORT_ON_CHAIN'] = resp;
-            service.step_state['PROCESS_PRICE'] = 'DONE';
+            service.step_data!['ANALYSIS_REPORT_ON_CHAIN'] = resp;
+            service.step_state!['PROCESS_PRICE'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_PRICE DONE';
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_PRICE'});
             logger.warn('***** ACTION PROCESS_PRICE DONE *****');
-            service.is_action_executing['PROCESS_PRICE'] = false;
-            return true;
+            service.is_action_executing!['PROCESS_PRICE'] = false;
+            return;
         } catch (error) {
             logger.error("Error in price analyse:", error);
             if(callback){
@@ -75,15 +75,13 @@ export const processPriceData: Action = {
                     text:`
                     Error in price analyze:
                     
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
             }
-            return false;
+            return;
         }
     },
-    examples: [
-    ] as ActionExample[][],
+    examples: [],
 } as Action;
 

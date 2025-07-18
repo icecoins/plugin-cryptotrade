@@ -30,14 +30,14 @@ export const processNewsData: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing['PROCESS_NEWS']){
+            if(service.is_action_executing!['PROCESS_NEWS']){
                 logger.error('***** ACTION PROCESS_NEWS IS RUNNING, SKIP ACTION  ***** \n');
-                return false;
+                return;
             }
-            service.is_action_executing['PROCESS_NEWS'] = true;
+            service.is_action_executing!['PROCESS_NEWS'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_NEWS START\n`);
             let tmp = await service.getPromptOfProcessNewsData('BTC', service.price_data[service.today_idx].key)
             const prompt = composePromptFromState({
@@ -52,28 +52,26 @@ export const processNewsData: Action = {
                     text:`Here is the reponse of News Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_data['ANALYSIS_REPORT_NEWS'] = resp;
-            service.step_state['PROCESS_NEWS'] = 'DONE';
+            service.step_data!['ANALYSIS_REPORT_NEWS'] = resp;
+            service.step_state!['PROCESS_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_NEWS DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_NEWS'});
             logger.warn('***** ACTION PROCESS_NEWS DONE *****')
-            service.is_action_executing['PROCESS_NEWS'] = false;
-            return true;
+            service.is_action_executing!['PROCESS_NEWS'] = false;
+            return;
         } catch (error) {
             logger.error("Error in news analyse:", error);
             if(callback){
                 callback({
                     text:`
                     Error in news analyze:
-                    
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
             }
-            return false;
+            return;
         }
     },
     examples: [

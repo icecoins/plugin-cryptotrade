@@ -34,49 +34,50 @@ export const getNewsData: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             const service = runtime.getService(ApiService.serviceType) as ApiService;
             
-            if(service.is_action_executing['GET_NEWS']){
+            if(service.is_action_executing!['GET_NEWS']){
                 // logger.error('***** ACTION GET_NEWS IS RUNNING, SKIP ACTION  ***** \n');
-                return false;
+                return;
             }
-            service.is_action_executing['GET_NEWS'] = true;
+            service.is_action_executing!['GET_NEWS'] = true;
             logger.warn('***** GET NEWS DATA START ***** \n');
             const resp = `service.loadNewsData: ` + await service.loadNewsData();
+            // service.getNews()
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
             if(callback && service.callbackInActions){
                 if(!resp){
                     callback({
                         text:`Error in fetch news DATA. `
                     });
-                    return false;
+                    return;
                 }
                 callback({
                     thought: resp,
                     text: `News data loaded. `
                 });
             }            
-            service.step_state['GET_NEWS'] = 'DONE';
+            service.step_state!['GET_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_GET_NEWS DONE';
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_GET_NEWS'});
             logger.warn('***** ACTION GET_NEWS DONE *****')
-            service.is_action_executing['GET_NEWS'] = false;
-            return true;
+            service.is_action_executing!['GET_NEWS'] = false;
+            return;
         } catch (error) {
             logger.error("Error in news fetch:", error);
             if(callback){
                 callback({
                     text:`
                     Error in news fetch:
-                    ${error.message}
+                    ${error}
                     `
                 });
             }
-            return false;
+            return;
         }
     },
     examples: [

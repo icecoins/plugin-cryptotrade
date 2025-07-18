@@ -27,7 +27,7 @@ export const getDailyPrice: Action = {
         _options:{[key:string]:unknown},
         callback: HandlerCallback,
         _responses: Memory[]
-    ): Promise<boolean> => {
+    ): Promise<void> => {
         try {
             const binanceService = runtime.getService(BinanceService.serviceType) as BinanceService;
             const data = await binanceService.getDailyPrice('BTCUSDT');
@@ -41,19 +41,19 @@ export const getDailyPrice: Action = {
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_CALL_BINANCE_API'});
             logger.warn('***** ACTION CALL_BINANCE_API DONE *****')
-            return true;
+            return;
         } catch (error) {
             logger.error("Error in CALL_BINANCE_API:", error);
             if(callback){
                 callback({
                     text:`
                     Error in CALL_BINANCE_API:
-                    ${error.message}
+                    ${error}
                     `
                 });
-                return false;
+                return;
             }
-            return false;
+            return;
         }
     },
     examples: [
