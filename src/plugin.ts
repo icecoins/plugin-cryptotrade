@@ -33,7 +33,7 @@ const managerMsgHandler = async ({
   let args:string[];
   if(message.content.text){
     args = message.content.text.split(',');
-    if(!args || args.length < 3 || !(args[0] === 'crypto')){
+    if(!args || args.length < 3 || !(args[0] === 'crypto' || args[0] === 'cryptotrade')){
       // cryptotrade, trade, callBinanceAPI
       await callback({
                     text:`Invalid args.\nIf you are trying to use plugin-cryptotrade for ElizaOS, please format your input text as:\n\ncryptotrade,1,0\n\nWhich means use_cryptotrade?, for_trade?, test_call_binance_API?\n`,

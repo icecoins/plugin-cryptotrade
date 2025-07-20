@@ -66,7 +66,7 @@ export const manageTemplate_take_actions = `
   # Now, choose your next actions:
   `;
 
-export const data_dir_path = './data/local/binance/'
+export const data_dir_path = 'data/local/binance/'
 export const price_path = data_dir_path + 'bitcoin_daily_price.csv';
 export const transaction_path = data_dir_path + 'bitcoin_transaction_statistics.csv';
 

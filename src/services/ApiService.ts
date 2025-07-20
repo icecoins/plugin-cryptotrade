@@ -5,13 +5,14 @@ import {
     Service} from "@elizaos/core";
 import * as fs from 'fs';
 import { writeFile, mkdir } from 'fs/promises';
-
 import path, { resolve } from "path";
 import * as readline from 'readline';
 import { data_dir_path as data_dir_binance, delim, EX_RATE, GAS_FEE, LLM_retry_times, price_path, STARTING_CASH_RATIO, starting_date, STARTING_NET_WORTH, transaction_path } from "../const/Const";
 import { BinanceService } from "./BinanceService";
 import { KlineInterval, SymbolPrice} from 'binance';
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 function ewma(data: number[], span: number): number[] {
     const alpha = 2 / (span + 1);
@@ -652,27 +653,49 @@ Input article data:
     await writeFile(destination, buffer);
     logger.log(`Downloaded zip to ${destination}`);
   }
+
+  async unzipWithSystem(zipFilePath: string, outputDir: string) {
+    const command = `unzip -o "${zipFilePath}" -d "${outputDir}"`;
+    logger.warn(`🧩 Running: ${command}`);
+    const execAsync = promisify(exec);
+    await execAsync(command);
+    logger.warn(`✅ Unzipped to ${outputDir}`);
+  }
+
   public async initOnChainDataFromBinance(range:'daily'|'monthly' = 'daily', symbol = 'BTCUSDT', interval:KlineInterval = '1h', force = false){
     // https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2025-06.zip
     // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-14.zip
     let date = new Date();
     date.setDate(date.getDate() - 3);
+
+    // 2025-07-14
     const reqDate = this.parseDateToString(date, 'day');
-    const info = `spot/${range}/klines/${symbol}/${interval}/${symbol}-${interval}-${reqDate}`;
-    const url = `https://data.binance.vision/data/${info}`;
+
+    // spot/daily/klines/BTCUSDT/15m
+    const info = `spot/${range}/klines/${symbol}/${interval}`;
+    // BTCUSDT-1h-2025-06-11.zip
+    const zipFileName = `${symbol}-${interval}-${reqDate}.zip`;
+    // ./data/local/binance/zip/spot/daily/klines/BTCUSDT/15m
     const outputDir = `${data_dir_binance}zip/${info}`;
-    const unzipDir = `${data_dir_binance}${info}`;
     if(!fs.existsSync(outputDir)){
-      fs.mkdirSync(outputDir);
+      fs.mkdirSync(outputDir, {recursive: true});
     }
-    try{
-      await this.downloadZip(url, outputDir);
-      await mkdir(unzipDir, { recursive: true });
-      
-      // import extract from 'extract-zip';
-      // await extract(outputDir, { dir: path.resolve(unzipDir) });
-    }catch(error){
-      throw new Error('Error: ' + error);
+    // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-12.zip
+    const url = `https://data.binance.vision/data/${info}/${zipFileName}`;
+
+    const zipFilePath = `${outputDir}/${zipFileName}`;
+
+    const unzipDir = `${data_dir_binance}${info}`;
+    if(!fs.existsSync(unzipDir)){
+      fs.mkdirSync(unzipDir, {recursive: true});
+    }
+    if(!fs.existsSync(zipFilePath)){
+      try{
+        await this.downloadZip(url, zipFilePath);
+        await this.unzipWithSystem(zipFilePath, unzipDir);
+      }catch(error){
+        throw new Error('Error: ' + error);
+      }
     }
   }
 
