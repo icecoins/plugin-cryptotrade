@@ -1,7 +1,5 @@
 # How to set up the development environment for Plugin-Cryptotrade
 
-[TOC]
-
 
 
 ## 1. Set up ElizaOS
@@ -83,9 +81,6 @@ elizaos agent start --path=./path/to/<agent-name>.json
 
 You can also operate your agent in the browser (http://localhost:3000/)
 
-![image-20250716140724259](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716140724259.png)
-
-![image-20250716140739188](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716140739188.png)
 
 
 
@@ -122,7 +117,6 @@ let result = service.YourFunction2();
 ......
 ```
 
-![image-20250716153033088](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716153033088.png)
 
 You can modify the code in path/to/\<your-plugin-dir\>/src/plugin.ts directly, or create a new file eg: MyService.ts, then finish and export your service.
 
@@ -134,19 +128,14 @@ The code in **handler: async (…){…}** will be executed by ElizaOS.
 
 **await callback(…)** will return some messages to user (eg: to browser)
 
-![image-20250716154627119](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716154627119.png)
 
 You can define actions in a order, and use **await runtime.processActions(message, [_responseMessage], _state, callback)** to execute them.
-
-![image-20250716154452607](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716154452607.png)
 
 #### 2.2.3. Events
 
 EventType.MESSAGE_RECEIVED will be detected as user sent a message.
 
 You can define what to do when the event happened, for example, execute some Actions.
-
-![image-20250716160526458](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716160526458.png)
 
 #### 2.2.4. Publish and test
 
@@ -214,7 +203,6 @@ The data should be placed at
 /path/to/your/elizaos-proj/data
 ```
 
-![image-20250716163601768](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716163601768.png)
 
 And you should edit you .env file under the ElizaOS-Project, add some configuration information
 
