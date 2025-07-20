@@ -1,255 +1,277 @@
-# ElizaOS Plugin
+# How to set up the development environment for Plugin-Cryptotrade
 
-This is an ElizaOS plugin built with the official plugin starter template.
+[TOC]
 
-## Getting Started
 
-```bash
-# Create a new plugin (automatically adds "plugin-" prefix)
-elizaos create -t plugin solana
-# This creates: plugin-solana
-# Dependencies are automatically installed and built
 
-# Navigate to the plugin directory
-cd plugin-solana
+## 1. Set up ElizaOS
 
-# Start development immediately
-elizaos dev
+### 1.1. Install npm
+
+```
+https://nodejs.org/en/download
 ```
 
-## Development
+### 1.2. install bun
 
-```bash
-# Start development with hot-reloading (recommended)
-elizaos dev
+```
+https://bun.sh/
+```
 
-# OR start without hot-reloading
+### 1.3. Install ElizaOS
+
+```
+bun i -g @elizaos/cli
+```
+
+### 1.4. Create an ElizaOS project
+
+```
+elizaos create
+# choose [Project - Full ElizaOS application] and set a <project-name>
+
+cd <project-name>
+# launch project
 elizaos start
-# Note: When using 'start', you need to rebuild after changes:
-# bun run build
 
-# Test the plugin
-elizaos test
+# if you choose to use local-ai, ElizaOS will download Llama models.
 ```
 
-## Testing
+### 1.5. Create an ElizaOS agent
 
-ElizaOS provides a comprehensive testing structure for plugins:
-
-### Test Structure
-
-- **Component Tests** (`__tests__/` directory):
-
-  - **Unit Tests**: Test individual functions/classes in isolation
-  - **Integration Tests**: Test how components work together
-  - Run with: `elizaos test component`
-
-- **End-to-End Tests** (`__tests__/e2e/` directory):
-
-  - Test the plugin within a full ElizaOS runtime
-  - Validate complete user scenarios with a real agent
-  - Run with: `elizaos test e2e`
-
-- **Running All Tests**:
-  - `elizaos test` runs both component and e2e tests
-
-### Writing Tests
-
-Component tests use Vitest:
-
-```typescript
-// Unit test example (__tests__/plugin.test.ts)
-describe('Plugin Configuration', () => {
-  it('should have correct plugin metadata', () => {
-    expect(starterPlugin.name).toBe('plugin-tmp');
-  });
-});
-
-// Integration test example (__tests__/integration.test.ts)
-describe('Integration: HelloWorld Action with StarterService', () => {
-  it('should handle HelloWorld action with StarterService', async () => {
-    // Test interactions between components
-  });
-});
+```
+# create a new terminal
+elizaos create 
+# choose [Agent - Character definition file] and set a <agent-name>
+# ElizaOS will create a new file: <agent-name>.json
 ```
 
-E2E tests run in a real ElizaOS runtime:
+#### 1.5.1. Configure your agent
 
-```typescript
-// E2E test example (__tests__/e2e/starter-plugin.ts)
-export const StarterPluginTestSuite: TestSuite = {
-  name: 'plugin_starter_test_suite',
-  description: 'E2E tests for the starter plugin',
-  tests: [
-    {
-      name: 'hello_world_action_test',
-      fn: async (runtime) => {
-        // Simulate user asking agent to say hello
-        const testMessage = {
-          content: { text: 'Can you say hello?' }
-        };
+You can edit \<agent-name\>.json directly, add your custom plugin in "plugins": […]
 
-        // Execute action and capture response
-        const response = await helloWorldAction.handler(runtime, testMessage, ...);
+**!!! Notice: if you choose to use [@icecoins/plugin-cryptotrade], please remove [@elizaos/plugin-bootstrap].**
 
-        // Verify agent responds with "hello world"
-        if (!response.text.includes('hello world')) {
-          throw new Error('Expected "hello world" in response');
-        }
-      },
-    },
+```
+{
+  "name": "my-agent",
+  "plugins": [
+    "@elizaos/plugin-sql",
+    "@elizaos/plugin-local-ai",
+    "@icecoins/plugin-cryptotrade",
+    "@elizaos/plugin-bootstrap"
   ],
-};
-```
-
-#### Key E2E Testing Features:
-
-- **Real Runtime Environment**: Tests run with a fully initialized ElizaOS runtime
-- **Plugin Interaction**: Test how your plugin behaves with the actual agent
-- **Scenario Testing**: Validate complete user interactions, not just individual functions
-- **No Mock Required**: Access real services, actions, and providers
-
-#### Writing New E2E Tests:
-
-1. Add a new test object to the `tests` array in your test suite
-2. Each test receives the runtime instance as a parameter
-3. Throw errors to indicate test failures (no assertion library needed)
-4. See the comprehensive documentation in `__tests__/e2e/starter-plugin.ts` for detailed examples
-
-The test utilities in `__tests__/test-utils.ts` provide mock objects and setup functions to simplify writing component tests.
-
-## Publishing & Continuous Development
-
-### Initial Setup
-
-Before publishing your plugin, ensure you meet these requirements:
-
-1. **npm Authentication**
-
-   ```bash
-   npm login
-   ```
-
-2. **GitHub Repository**
-
-   - Create a public GitHub repository for this plugin
-   - Add the 'elizaos-plugins' topic to the repository
-   - Use 'main' as the default branch
-
-3. **Required Assets**
-   - Add images to the `images/` directory:
-     - `logo.jpg` (400x400px square, <500KB)
-     - `banner.jpg` (1280x640px, <1MB)
-
-### Initial Publishing
-
-```bash
-# Test your plugin meets all requirements
-elizaos publish --test
-
-# Publish to npm + GitHub + registry (recommended)
-elizaos publish
-```
-
-This command will:
-
-- Publish your plugin to npm for easy installation
-- Create/update your GitHub repository
-- Submit your plugin to the ElizaOS registry for discoverability
-
-### Continuous Development & Updates
-
-**Important**: After your initial publish with `elizaos publish`, all future updates should be done using standard npm and git workflows, not the ElizaOS CLI.
-
-#### Standard Update Workflow
-
-1. **Make Changes**
-
-   ```bash
-   # Edit your plugin code
-   elizaos dev  # Test locally with hot-reload
-   ```
-
-2. **Test Your Changes**
-
-   ```bash
-   # Run all tests
-   elizaos test
-
-   # Run specific test types if needed
-   elizaos test component  # Component tests only
-   elizaos test e2e       # E2E tests only
-   ```
-
-3. **Update Version**
-
-   ```bash
-   # Patch version (bug fixes): 1.0.0 → 1.0.1
-   npm version patch
-
-   # Minor version (new features): 1.0.1 → 1.1.0
-   npm version minor
-
-   # Major version (breaking changes): 1.1.0 → 2.0.0
-   npm version major
-   ```
-
-4. **Publish to npm**
-
-   ```bash
-   npm publish
-   ```
-
-5. **Push to GitHub**
-   ```bash
-   git push origin main
-   git push --tags  # Push version tags
-   ```
-
-#### Why Use Standard Workflows?
-
-- **npm publish**: Directly updates your package on npm registry
-- **git push**: Updates your GitHub repository with latest code
-- **Automatic registry updates**: The ElizaOS registry automatically syncs with npm, so no manual registry updates needed
-- **Standard tooling**: Uses familiar npm/git commands that work with all development tools
-
-### Alternative Publishing Options (Initial Only)
-
-```bash
-# Publish to npm only (skip GitHub and registry)
-elizaos publish --npm
-
-# Publish but skip registry submission
-elizaos publish --skip-registry
-
-# Generate registry files locally without publishing
-elizaos publish --dry-run
-```
-
-## Configuration
-
-The `agentConfig` section in `package.json` defines the parameters your plugin requires:
-
-```json
-"agentConfig": {
-  "pluginType": "elizaos:plugin:1.0.0",
-  "pluginParameters": {
-    "API_KEY": {
-      "type": "string",
-      "description": "API key for the service"
-    }
-  }
+  "secrets": {},
+  ......
 }
 ```
 
-Customize this section to match your plugin's requirements.
+#### 1.5.2. Start/Stop/Delete Agent
 
-## Documentation
+After you changed <agent-name>.json, remove agent by agent-name and restart it
 
-Provide clear documentation about:
+```
+# launch agent, Ensure that the ElizaOS-project is running
+elizaos agent start --path=./path/to/<agent-name>.json
 
-- What your plugin does
-- How to use it
-- Required API keys or credentials
-- Example usage
-- Version history and changelog
+# remove agent to reload <agent-name>.json
+elizaos remove --name my-agent
+
+# Configure you agent .json file and restart it
+elizaos agent start --path=./path/to/<agent-name>.json
+```
+
+You can also operate your agent in the browser (http://localhost:3000/)
+
+![image-20250716140724259](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716140724259.png)
+
+![image-20250716140739188](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716140739188.png)
+
+
+
+
+
+## 2. Develop in your plugin and merge it to our project later (recommanded)
+
+### 2.1. Create your plugin
+
+```
+elizaos create
+# choose [Plugin - Custom ElizaOS plugin]
+cd <your-plugin-dir>
+```
+
+### 2.2. Develop your plugin
+
+Plugin entry point:
+
+```
+path/to/<your-plugin-dir>/src/plugin.ts
+```
+
+A plugin consists of Services, Actions, Events, …
+
+#### 2.2.1. Service
+
+You can define data structs and functions in service, and use them in anywhere, like:
+
+```
+let service = runtime.getService(YourService.serviceType) as YourService;
+await service.YourFunction1();
+let result = service.YourFunction2();
+......
+```
+
+![image-20250716153033088](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716153033088.png)
+
+You can modify the code in path/to/\<your-plugin-dir\>/src/plugin.ts directly, or create a new file eg: MyService.ts, then finish and export your service.
+
+#### 2.2.2. Action
+
+A plugin includes one or more actions. An action has its name. ElizaOS will **find the actions by their names**, then execute them in order.
+
+The code in **handler: async (…){…}** will be executed by ElizaOS.
+
+**await callback(…)** will return some messages to user (eg: to browser)
+
+![image-20250716154627119](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716154627119.png)
+
+You can define actions in a order, and use **await runtime.processActions(message, [_responseMessage], _state, callback)** to execute them.
+
+![image-20250716154452607](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716154452607.png)
+
+#### 2.2.3. Events
+
+EventType.MESSAGE_RECEIVED will be detected as user sent a message.
+
+You can define what to do when the event happened, for example, execute some Actions.
+
+![image-20250716160526458](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716160526458.png)
+
+#### 2.2.4. Publish and test
+
+**!!! Notice: After you finish your plugin, you should publish it to npmjs.com**
+
+ElizaOS cannot install plugin locally, it will use **bun add @author/plugin-name** to install a plugin from npmjs.com
+
+Go to https://www.npmjs.com/ in your browser, and sign up.
+
+Then go back to terminal
+
+```
+bun run build
+# if build error, try this may help: # bun install typescipt # bun install tsup
+bun publish
+# there will be a link for you to login to npmjs.com, open it in browser
+```
+
+After you publish your plugin
+
+1. Add your plugin to your agent, as mentioned before.
+
+   You can edit \<agent-name\>.json directly, add your custom plugin in "plugins": […]
+
+2. Start your agent.
+
+3. Test your plugin.
+
+If you don’t want to publish it every time your modified the plugin, you can replace the dist .js file directly. (but you still have to publish it at first time)
+
+```
+cd /path/to/your/plugin-dir/
+
+bun run build && 
+rm -r /path/to/your/project-dir/node_modules/<@your-plugin-name>/dist && 
+cp -r dist /path/to/your/project-dir/node_modules/<@your-plugin-name>/dist
+
+cd /path/to/your/project-dir/
+elizaos start
+```
+
+
+
+## 3. Develop in plugin-cryptotrade directly
+
+### 3.1. Fork and clone repo
+
+```
+# fork https://github.com/icecoins/plugin-cryptotrade
+git clone https://github.com/your-account/plugin-cryptotrade
+cd plugin-cryptotrade
+```
+
+If you want to run plugin-cryptotrade, you have to download some price/tansaction/news data, and put them into your ElizaOS-project
+
+The data can be downloaded at (if the link isn’t available, please contact with me):
+
+```
+https://i.i64.cc/s/gwFG
+```
+
+The data should be placed at
+
+```
+/path/to/your/elizaos-proj/data
+```
+
+![image-20250716163601768](C:\Users\6226\AppData\Roaming\Typora\typora-user-images\image-20250716163601768.png)
+
+And you should edit you .env file under the ElizaOS-Project, add some configuration information
+
+```
+/path/to/elizaos-project/.env
+```
+
+```
+SENTRY_TRACES_SAMPLE_RATE=
+SENTRY_SEND_DEFAULT_PII=
+...
+# The API key of binance
+CRYPT_BINANCE_API_KEY=
+CRYPT_BINANCE_KEY=
+
+CRYPT_STARTING_DAY=
+CRYPT_ENDING_DAY=
+# bear bull sideways
+CRYPT_STAGE=bear
+
+CRYPT_CALLBACK_IN_ACTIONS=false
+# set to false to use openPrice and MACD only
+CRYPT_USE_TRANSACTION=true
+CRYPT_ENABLE_NEWS_SIMPLIFICATION=false
+# Developing
+CRYPT_CUSTOM_TIME_SLOT=false
+...
+PGLITE_DATA_DIR=.../.eliza/.elizadb
+```
+
+
+
+### 3.2. Create your Services in ./plugin-cryptotrade/src/services
+
+### 3.3. Create your Actions in ./plugin-cryptotrade/src/actions
+
+### 3.4. Modify ./plugin-cryptotrade/src/plugin.ts to include your feature
+
+### 3.5. Test your feature and pull request
+
+
+
+## 4. Some additional information
+
+### 4.1. ElizaOS doc:  https://eliza.how/
+
+### 4.2. Some slides used in early meetings
+
+```
+https://i.i64.cc/s/P7Tz
+```
+
+
+
+## 5. Thanks for reading
+
+I hope this doc can help you, if you have any problems, please contact with me at anytime.
+
+
+

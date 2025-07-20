@@ -36,7 +36,13 @@
   ],
   "dependencies": {
     "@elizaos/core": "latest",
-    "binance": "^3.0.0"
+    "@elizaos/plugin-ollama": "^1.2.1",
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "binance": "^3.0.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.1",
+    "unzipper": "^0.12.3"
   },
   "peerDependencies": {},
   "devDependencies": {
