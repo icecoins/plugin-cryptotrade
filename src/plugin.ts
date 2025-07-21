@@ -46,7 +46,7 @@ const managerMsgHandler = async ({
       let actions:string[] = [];
       if(args![1] === '1' || args![1] === 'true'){
         actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
-        if(service.enableNewsSimplification){
+        if(service.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
           actions.push('SUMMARIZE_NEWS');
         }
         actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);

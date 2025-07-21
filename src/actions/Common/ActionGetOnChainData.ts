@@ -75,12 +75,12 @@ export const getOnChainData: Action = {
             service.is_action_executing!['GET_PRICE'] = true;
             // logger.error('***** ACTION GET_PRICE START ***** \n');
             await service.loadPriceData();
-            if(service.useTransactionData){
+            if(service.CRYPT_ENABLE_TRANSACTION_DATA){
                 await service.loadTransactionData(true);
             }
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             if(!service.today_idx || !service.end_day_idx){
-                if(service.customTimeSlot){
+                if(service.CRYPT_CUSTOM_DATE_INTERVAL){
                     service.today_idx = service.price_data.length - 2;
                     service.end_day_idx = service.price_data.length;
                     service.start_day = service.price_data[service.today_idx].key;
@@ -117,7 +117,7 @@ export const getOnChainData: Action = {
             logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
             logger.warn('***** GET_PRICE DATA END ***** \n');
             const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
-            if(callback && service.callbackInActions){
+            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
                     thought:``,
                     text:`Here is the on-chain price data: ${resp} `

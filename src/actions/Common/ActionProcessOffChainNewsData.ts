@@ -46,7 +46,7 @@ export const processNewsData: Action = {
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
-            if(callback && service.callbackInActions){
+            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
                     thought:`Reading news on ${service.price_data[service.today_idx].key}...`,
                     text:`Here is the reponse of News Analysis Agent:\n\t\t${resp}`,

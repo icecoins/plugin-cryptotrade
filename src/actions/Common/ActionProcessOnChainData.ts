@@ -45,7 +45,7 @@ export const processPriceData: Action = {
                     template:tmp
                 });
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            if(callback && service.callbackInActions){
+            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 if(!resp || resp === ''){
                     callback({
                         text:`

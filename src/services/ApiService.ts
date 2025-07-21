@@ -123,10 +123,6 @@ export class ApiService extends Service {
   public offChainNewsLoaded = false;
   public abortAllTasks = false;
 
-  public callbackInActions = true;
-  public enableNewsSimplification = false;
-  public useTransactionData = false;
-  public customTimeSlot:boolean = false;
   public project_initialized:boolean = false;
 
   public cash:number|undefined;
@@ -145,6 +141,11 @@ export class ApiService extends Service {
   public CRYPT_STARTING_DAY:string|undefined;
   public CRYPT_ENDING_DAY:string|undefined;
   public CRYPT_STAGE:string|undefined;
+  public CRYPT_ENABLE_NEWS_ANALYZE = true;
+  public CRYPT_ENABLE_NEWS_SIMPLIFICATION = false;
+  public CRYPT_ENABLE_TRANSACTION_DATA = false;
+  public CRYPT_CALLBACK_IN_ACTIONS = true;
+  public CRYPT_CUSTOM_DATE_INTERVAL = false;
 
   public dumpRecordPath:string|undefined;
 
@@ -160,33 +161,40 @@ export class ApiService extends Service {
     }
     if(process.env.CRYPT_CUSTOM_TIME_SLOT){
       if(process.env.CRYPT_CUSTOM_TIME_SLOT === 'true'){
-        this.customTimeSlot = true;
+        this.CRYPT_CUSTOM_DATE_INTERVAL = true;
       }else{
-        this.customTimeSlot = false;
+        this.CRYPT_CUSTOM_DATE_INTERVAL = false;
       }
     }
     if(process.env.CRYPT_CALLBACK_IN_ACTIONS){
       if(process.env.CRYPT_CALLBACK_IN_ACTIONS === 'true'){
-        this.callbackInActions = true;
+        this.CRYPT_CALLBACK_IN_ACTIONS = true;
       }else{
-        this.callbackInActions = false;
+        this.CRYPT_CALLBACK_IN_ACTIONS = false;
+      }
+    }
+    if(process.env.CRYPT_ENABLE_NEWS_ANALYZE){
+      if(process.env.CRYPT_ENABLE_NEWS_ANALYZE === 'true'){
+        this.CRYPT_ENABLE_NEWS_ANALYZE = true;
+      }else{
+        this.CRYPT_ENABLE_NEWS_ANALYZE = false;
       }
     }
     if(process.env.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
       if(process.env.CRYPT_ENABLE_NEWS_SIMPLIFICATION === 'true'){
-        this.enableNewsSimplification = true;
+        this.CRYPT_ENABLE_NEWS_SIMPLIFICATION = true;
       }else{
-        this.enableNewsSimplification = false;
+        this.CRYPT_ENABLE_NEWS_SIMPLIFICATION = false;
       }
     }
     if(process.env.CRYPT_USE_TRANSACTION){
       if(process.env.CRYPT_USE_TRANSACTION === 'true'){
-        this.useTransactionData = true;
+        this.CRYPT_ENABLE_TRANSACTION_DATA = true;
       }else{
-        this.useTransactionData = false;
+        this.CRYPT_ENABLE_TRANSACTION_DATA = false;
       }
     }
-    logger.error(`Config init done:\nthis.CRYPT_STARTING_DAY: ${this.CRYPT_STARTING_DAY}\nthis.CRYPT_STAGE: ${this.CRYPT_STAGE}\nthis.callbackInActions: ${this.callbackInActions}\nthis.enableNewsSimplification: ${this.enableNewsSimplification}`);
+    logger.error(`Config init done:\nthis.CRYPT_STARTING_DAY: ${this.CRYPT_STARTING_DAY}\nthis.CRYPT_STAGE: ${this.CRYPT_STAGE}\nthis.callbackInActions: ${this.CRYPT_CALLBACK_IN_ACTIONS}\nthis.enableNewsSimplification: ${this.CRYPT_ENABLE_NEWS_SIMPLIFICATION}`);
   }
 
   initProject(){
@@ -277,7 +285,7 @@ export class ApiService extends Service {
       rl.on('line', (line) => {
         if(!firstLine){
           let data = line.split(','); // ...,2781,42569.7614,43243.16818,41879.18999,...
-          if (!this.customTimeSlot) {
+          if (!this.CRYPT_CUSTOM_DATE_INTERVAL) {
             data[0] = data[0].substring(0, 10);
           }
           let values: Record<string, any> = {}; // day:xx, unique_addresses:xxx, ...
@@ -340,7 +348,7 @@ export class ApiService extends Service {
       try {
         let values = {};
         if(local){
-          if (this.customTimeSlot) {
+          if (this.CRYPT_CUSTOM_DATE_INTERVAL) {
             res = await this.readLocalCsvFile(transaction_path, "transaction", true);
           } else {
             res = await this.readLocalCsvFile("./data/local/bitcoin_transaction_statistics.csv", "transaction", false);
@@ -420,7 +428,7 @@ export class ApiService extends Service {
         let values:string;
         let data_path:string;
         if(local){
-          if (this.customTimeSlot) {
+          if (this.CRYPT_CUSTOM_DATE_INTERVAL) {
             if (!fs.existsSync(data_dir_binance)) {
               fs.mkdirSync(data_dir_binance);
             }
@@ -651,7 +659,7 @@ Input article data:
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await writeFile(destination, buffer);
-    logger.log(`Downloaded zip to ${destination}`);
+    // logger.log(`Downloaded zip to ${destination}`);
   }
 
   async unzipWithSystem(zipFilePath: string, outputDir: string) {
@@ -666,36 +674,40 @@ Input article data:
     // https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2025-06.zip
     // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-14.zip
     let date = new Date();
-    date.setDate(date.getDate() - 3);
+    let stop_today = new Date();
+    stop_today.setDate(stop_today.getDate() - 7);
+    date.setMonth(stop_today.getMonth() - 1);
+    while(date.getTime() != stop_today.getTime()){
+      // 2025-07-14
+      const reqDate = this.parseDateToString(date, 'day');
 
-    // 2025-07-14
-    const reqDate = this.parseDateToString(date, 'day');
-
-    // spot/daily/klines/BTCUSDT/15m
-    const info = `spot/${range}/klines/${symbol}/${interval}`;
-    // BTCUSDT-1h-2025-06-11.zip
-    const zipFileName = `${symbol}-${interval}-${reqDate}.zip`;
-    // ./data/local/binance/zip/spot/daily/klines/BTCUSDT/15m
-    const outputDir = `${data_dir_binance}zip/${info}`;
-    if(!fs.existsSync(outputDir)){
-      fs.mkdirSync(outputDir, {recursive: true});
-    }
-    // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-12.zip
-    const url = `https://data.binance.vision/data/${info}/${zipFileName}`;
-
-    const zipFilePath = `${outputDir}/${zipFileName}`;
-
-    const unzipDir = `${data_dir_binance}${info}`;
-    if(!fs.existsSync(unzipDir)){
-      fs.mkdirSync(unzipDir, {recursive: true});
-    }
-    if(!fs.existsSync(zipFilePath)){
-      try{
-        await this.downloadZip(url, zipFilePath);
-        await this.unzipWithSystem(zipFilePath, unzipDir);
-      }catch(error){
-        throw new Error('Error: ' + error);
+      // spot/daily/klines/BTCUSDT/15m
+      const info = `spot/${range}/klines/${symbol}/${interval}`;
+      // BTCUSDT-1h-2025-06-11.zip
+      const zipFileName = `${symbol}-${interval}-${reqDate}.zip`;
+      // ./data/local/binance/zip/spot/daily/klines/BTCUSDT/15m
+      const outputDir = `${data_dir_binance}zip/${info}`;
+      if(!fs.existsSync(outputDir)){
+        fs.mkdirSync(outputDir, {recursive: true});
       }
+      // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-12.zip
+      const url = `https://data.binance.vision/data/${info}/${zipFileName}`;
+
+      const zipFilePath = `${outputDir}/${zipFileName}`;
+
+      const unzipDir = `${data_dir_binance}${info}`;
+      if(!fs.existsSync(unzipDir)){
+        fs.mkdirSync(unzipDir, {recursive: true});
+      }
+      if(!fs.existsSync(zipFilePath)){
+        try{
+          await this.downloadZip(url, zipFilePath);
+          await this.unzipWithSystem(zipFilePath, unzipDir);
+        }catch(error){
+          throw new Error('Error: ' + error);
+        }
+      }
+      date.setDate(date.getDate() + 1);
     }
   }
 
@@ -835,7 +847,7 @@ Input article data:
     let idx_price = this.price_data.findIndex((item: { key: string; }) => item.key === date);
     let price_s = "You are an " + chain + 
       "cryptocurrency trading analyst. The recent price and auxiliary information is given in chronological order below:" + delim;
-    if(!this.useTransactionData){
+    if(!this.CRYPT_ENABLE_TRANSACTION_DATA){
       if(-1 != idx_price){
         let idx_price_start = idx_price - windowSize < 0 ? 0 : idx_price - windowSize;
         for(; idx_price_start <= idx_price; idx_price_start++){
@@ -893,12 +905,15 @@ Input article data:
     }
   }
 
-  public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26', maxArticles:number = 3){
+  public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26', maxArticles:number = 3) :string{
+    if(!this.CRYPT_ENABLE_NEWS_ANALYZE){
+      return '';
+    }
     let idx_news = this.news_data.findIndex(item => item.date === date);
     logger.error('API SERVICE getPromptOfNewsData: [' + idx_news + ']\n');
     if(-1 != idx_news && this.news_data[idx_news].data.length > 0){
       let news_s = '';
-      if(this.enableNewsSimplification){
+      if(this.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
         if(!(this.news_data.length > 0)){
           throw new Error(`Error: The SIMPLIFIED_NEWS set on ${this.step_data!['DATE']} is empty.`);
         }
@@ -953,7 +968,15 @@ Input article data:
 
   public getPromptOfMakeTrade(chain: string = 'btc'){
     let trade_s = `You are an experienced ${chain.toUpperCase()} cryptocurrency trader and you are trying to maximize your overall profit by trading ${chain.toUpperCase()}. In each day, you will make an action to buy or sell ${chain.toUpperCase()}. You are assisted by a few analysts below and need to decide the final action.`
-    trade_s += `\n\nON-CHAIN ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_ON_CHAIN']}${delim}\nNEWS ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_NEWS']}${delim}\nREFLECTION ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_REFLECT']}${delim}\n`;
+
+    trade_s += `\n\nON-CHAIN ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_ON_CHAIN']}${delim}\n`;
+
+    if(this.CRYPT_ENABLE_NEWS_ANALYZE){
+      trade_s += `NEWS ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_NEWS']}${delim}\n`;
+    }
+
+    trade_s += `REFLECTION ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_REFLECT']}${delim}\n`;
+
     trade_s += 'Now, start your response with your brief reasoning over the given reports. Then, based on the synthesized reports, conclude a clear market trend, emphasizing long-term strategies over short-term gains. Finally, indicate your trading action as a 1-decimal float in the range of [-1,1], reflecting your confidence in the market trend and your strategic decision to manage risk appropriately.'
     return trade_s;
   }

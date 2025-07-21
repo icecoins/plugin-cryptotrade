@@ -47,7 +47,7 @@ export const getNewsData: Action = {
             const resp = `service.loadNewsData: ` + await service.loadNewsData();
             // service.getNews()
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
-            if(callback && service.callbackInActions){
+            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 if(!resp){
                     callback({
                         text:`Error in fetch news DATA. `

@@ -39,7 +39,7 @@ export const simplifyNewsData: Action = {
             logger.error(`[CRYPTOTRADE] SIMPLIFY_NEWS START\n`);
             let resp = await service.simplifyNewsData();
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
-            if(callback && service.callbackInActions){
+            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
                     thought:`Reading raw news on ${service.price_data[service.today_idx].key}...`,
                     text:`Here is the reponse of Raw News Simplify Agent:\n\t\t${resp}`,
