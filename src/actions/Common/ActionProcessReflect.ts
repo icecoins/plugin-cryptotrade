@@ -47,7 +47,7 @@ export const processRelect: Action = {
             let resp = await service.tryToCallLLMsWithoutFormat(prompt);
             if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
-                    thought:`Reading actions and results on ${service.price_data[service.today_idx].key}...`,
+                    thought:``,
                     text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
                 });
             }

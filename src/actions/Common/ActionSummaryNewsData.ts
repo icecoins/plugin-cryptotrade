@@ -12,6 +12,7 @@ import {
 } from "@elizaos/core";
 import {v4} from 'uuid';
 import { ApiService } from "../../services/ApiService";
+import { LocalNewsAnalyseService } from "../../services/LocalNewsAnalyseService";
 export const simplifyNewsData: Action = {
     name: "SUMMARIZE_NEWS",
     similes: [
@@ -30,28 +31,29 @@ export const simplifyNewsData: Action = {
         _responses: Memory[]
     ): Promise<void> => {
         try {
-            let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing!['SIMPLIFY_NEWS']){
+            let apiService = runtime.getService(ApiService.serviceType) as ApiService;
+            let newsService = runtime.getService(LocalNewsAnalyseService.serviceType) as LocalNewsAnalyseService;
+            if(apiService.is_action_executing!['SIMPLIFY_NEWS']){
                 logger.error('***** ACTION SIMPLIFY_NEWS IS RUNNING, SKIP ACTION  ***** \n');
                 return;
             }
-            service.is_action_executing!['SIMPLIFY_NEWS'] = true;
+            apiService.is_action_executing!['SIMPLIFY_NEWS'] = true;
             logger.error(`[CRYPTOTRADE] SIMPLIFY_NEWS START\n`);
-            let resp = await service.simplifyNewsData();
+            let resp = await newsService.simplifyNewsData();
             // logger.error(`[CRYPTOTRADE] news analysis resp:\n${resp}\n\n`);
-            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
+            if(callback && apiService.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
-                    thought:`Reading raw news on ${service.price_data[service.today_idx].key}...`,
+                    thought:``,
                     text:`Here is the reponse of Raw News Simplify Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_state!['SIMPLIFY_NEWS'] = 'DONE';
+            apiService.step_state!['SIMPLIFY_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_SIMPLIFY_NEWS DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_NEWS'});
             logger.warn('***** ACTION SIMPLIFY_NEWS DONE *****')
-            service.is_action_executing!['SIMPLIFY_NEWS'] = false;
+            apiService.is_action_executing!['SIMPLIFY_NEWS'] = false;
             return;
         } catch (error) {
             logger.error("Error in news analyse:", error);

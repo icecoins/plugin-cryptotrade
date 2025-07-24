@@ -23,6 +23,7 @@ export enum Blockchains {
 
 import { v4 } from 'uuid';
 import { bear_ending_date, bear_starting_date, bull_ending_date, bull_starting_date, ending_date, sideways_ending_date, sideways_starting_date, starting_date } from "../../const/Const";
+import { PrinceAnalyzeService } from "../../services/PrinceAnalyzeService";
 
 export const getBlockchainPriceRequestSchema = z.object({
   blockchain: z
@@ -67,57 +68,25 @@ export const getOnChainData: Action = {
         _responses: Memory[]
     ): Promise<unknown> => {
         try {
-            let service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing!['GET_PRICE']){
+            const apiService = runtime.getService(ApiService.serviceType) as ApiService;
+            if(apiService.is_action_executing!['GET_PRICE']){
                //  logger.error('***** ACTION GET_PRICE IS RUNNING, SKIP ACTION  ***** \n');
                 return false;
             }
-            service.is_action_executing!['GET_PRICE'] = true;
+            apiService.is_action_executing!['GET_PRICE'] = true;
             // logger.error('***** ACTION GET_PRICE START ***** \n');
-            await service.loadPriceData();
-            if(service.CRYPT_ENABLE_TRANSACTION_DATA){
-                await service.loadTransactionData(true);
+            await apiService.loadPriceData();
+            if(apiService.CRYPT_ENABLE_TRANSACTION_DATA){
+                await apiService.loadTransactionData();
             }
-            logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
-            if(!service.today_idx || !service.end_day_idx){
-                if(service.CRYPT_CUSTOM_DATE_INTERVAL){
-                    service.today_idx = service.price_data.length - 2;
-                    service.end_day_idx = service.price_data.length;
-                    service.start_day = service.price_data[service.today_idx].key;
-                    service.end_day = service.price_data[service.end_day_idx].key;
-                }
-                else{
-                    if(service.CRYPT_STAGE){
-                        switch(service.CRYPT_STAGE){
-                            case 'bull':
-                                service.start_day = bull_starting_date;
-                                service.end_day = bull_ending_date;
-                                break;
-                            case 'bear':
-                                service.start_day = bear_starting_date;
-                                service.end_day = bear_ending_date;
-                                break;
-                            case 'sideways':
-                                service.start_day = sideways_starting_date;
-                                service.end_day = sideways_ending_date;
-                                break;
-                        }
-                    }else{
-                        service.start_day = starting_date;
-                        service.end_day = ending_date;
-                    }
-                    service.today_idx = service.price_data.findIndex(d => d.key === service.start_day);
-                    service.end_day_idx = service.price_data.findIndex(d => d.key === service.end_day);
-                }
+            
+            if (!apiService.project_initialized){
+                apiService.initProject();
             }
-            if (!service.project_initialized){
-                service.initProject();
-            }
-            service.step_data!["DATE"] = service.price_data[service.today_idx].key;
-            logger.warn(`today_idx: ${service.today_idx}\nend_day_idx: ${service.end_day_idx}`);
+            apiService.step_data!["DATE"] = apiService.getTodayString();
             logger.warn('***** GET_PRICE DATA END ***** \n');
-            const resp = `Price and transaction data loaded.\nBTC open price on  ${service.price_data[service.today_idx].value['timeOpen']} is  ${service.price_data[service.today_idx].value['open']}`;
-            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
+            const resp = `Price and transaction data loaded.\nBTC open price on  ${apiService.getTodayString()} is  ${apiService.getTodayOpenPrice()}`;
+            if(callback && apiService.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
                     thought:``,
                     text:`Here is the on-chain price data: ${resp} `
@@ -128,9 +97,9 @@ export const getOnChainData: Action = {
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message: message, source: 'CryptoTrade_Action_GET_PRICE'});
             logger.warn('***** ACTION GET_PRICE DONE *****')
-            service.step_state!['GET_PRICE'] = 'DONE';
-            service.step_state!['Executing'] = true;
-            service.is_action_executing!['GET_PRICE'] = false;
+            apiService.step_state!['GET_PRICE'] = 'DONE';
+            apiService.step_state!['Executing'] = true;
+            apiService.is_action_executing!['GET_PRICE'] = false;
             return;
         } catch (error) {
             logger.error("Error in price check:", error);

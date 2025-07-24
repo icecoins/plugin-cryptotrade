@@ -13,6 +13,7 @@ import {
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
 import { ApiService } from "../../services/ApiService";
+import { LocalNewsAnalyseService } from "../../services/LocalNewsAnalyseService";
 export const getNewsData: Action = {
     name: "GET_NEWS",
     similes: [
@@ -36,18 +37,17 @@ export const getNewsData: Action = {
         _responses: Memory[]
     ): Promise<void> => {
         try {
-            const service = runtime.getService(ApiService.serviceType) as ApiService;
-            
-            if(service.is_action_executing!['GET_NEWS']){
+            const apiService = runtime.getService(ApiService.serviceType) as ApiService;
+            if(apiService.is_action_executing!['GET_NEWS']){
                 // logger.error('***** ACTION GET_NEWS IS RUNNING, SKIP ACTION  ***** \n');
                 return;
             }
-            service.is_action_executing!['GET_NEWS'] = true;
+            apiService.is_action_executing!['GET_NEWS'] = true;
             logger.warn('***** GET NEWS DATA START ***** \n');
-            const resp = `service.loadNewsData: ` + await service.loadNewsData();
+            const resp = `service.loadNewsData: ` + await apiService.loadNewsData();
             // service.getNews()
             logger.warn('***** GET NEWS DATA END ***** \n', resp);
-            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
+            if(callback && apiService.CRYPT_CALLBACK_IN_ACTIONS){
                 if(!resp){
                     callback({
                         text:`Error in fetch news DATA. `
@@ -59,13 +59,13 @@ export const getNewsData: Action = {
                     text: `News data loaded. `
                 });
             }            
-            service.step_state!['GET_NEWS'] = 'DONE';
+            apiService.step_state!['GET_NEWS'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_GET_NEWS DONE';
             message.id = asUUID(v4());
             await runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_GET_NEWS'});
             logger.warn('***** ACTION GET_NEWS DONE *****')
-            service.is_action_executing!['GET_NEWS'] = false;
+            apiService.is_action_executing!['GET_NEWS'] = false;
             return;
         } catch (error) {
             logger.error("Error in news fetch:", error);
