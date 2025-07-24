@@ -5,26 +5,24 @@ export class BinanceService extends Service {
     
     public CRYPT_BINANCE_API_KEY:string|undefined;
     public CRYPT_BINANCE_KEY:string|undefined;
-    public client:MainClient;
+    public client:MainClient|undefined;
     
     capabilityDescription =
         'This is a binance service which is attached to the agent through the starter plugin.';
     constructor(runtime: IAgentRuntime) {
         super(runtime);
-        
-        this.client = new MainClient({
-            api_key: this.CRYPT_BINANCE_API_KEY,
-            api_secret: this.CRYPT_BINANCE_KEY,
-            testnet: true, // Connect to testnet environment
-        });
-
-        logger.info('*** Service Binance: Client Init done. ***');
     }
 
     static async start(runtime: IAgentRuntime) {
         logger.info(`*** Starting binance service - MODIFIED: ${new Date().toISOString()} ***`);
         const service = new BinanceService(runtime);
         service.initConfigs();
+        service.client = new MainClient({
+            api_key: service.CRYPT_BINANCE_API_KEY,
+            api_secret: service.CRYPT_BINANCE_KEY,
+            testnet: true, // Connect to testnet environment
+        });
+        logger.info('*** Service Binance: Client Init done. ***');
         return service;
     }
 
@@ -48,7 +46,7 @@ export class BinanceService extends Service {
     async getAvgPrice(coin_symbol:string = 'BTCUSDT'){
         return new Promise<CurrentAvgPrice>(async (resolve, reject) =>{
             try {
-                const price = await this.client.getAvgPrice({symbol:coin_symbol});
+                const price = await this.client!.getAvgPrice({symbol:coin_symbol});
                 resolve(price);
             } catch (error) {
                 reject(error)
@@ -58,7 +56,7 @@ export class BinanceService extends Service {
     async getTickerPrice(coin_symbol:string = 'BTCUSDT'){
         return new Promise<SymbolPrice|SymbolPrice[]>(async (resolve, reject) =>{
             try {
-                const price = await this.client.getSymbolPriceTicker({symbol:coin_symbol});
+                const price = await this.client!.getSymbolPriceTicker({symbol:coin_symbol});
                 resolve(price);
             } catch (error) {
                 reject(error)
@@ -72,7 +70,7 @@ export class BinanceService extends Service {
             try {
                 let startTime = structuredClone(endTime);
                 startTime.setSeconds(startTime.getSeconds() - 1);
-                const data = await this.client.getKlines({symbol:coin_symbol, interval: interval, 
+                const data = await this.client!.getKlines({symbol:coin_symbol, interval: interval, 
                     startTime:startTime.getTime(), endTime:endTime.getTime(), timeZone:timeZone, limit: limit});
                 // logger.error(`getRollingWindowTicker:\n${data}\n${JSON.stringify(data)}`);
                 resolve(data);
@@ -86,7 +84,7 @@ export class BinanceService extends Service {
         interval: KlineInterval = '4h', timeZone = '8', limit = 50){
         return new Promise<Kline[]>(async (resolve, reject) =>{
             try {
-                const data = await this.client.getKlines({symbol:coin_symbol, interval: interval, 
+                const data = await this.client!.getKlines({symbol:coin_symbol, interval: interval, 
                     startTime:startTime.getTime(), endTime:endTime.getTime(), timeZone:timeZone, limit: limit});
                 // logger.error(`getRollingWindowTicker:\n${data}\n${JSON.stringify(data)}`);
                 resolve(data);
@@ -99,7 +97,7 @@ export class BinanceService extends Service {
     async getRollingWindowTicker(coin_symbol:string = 'BTCUSDT', windowSize = 4){
         return new Promise<TradingDayTickerFull[] | TradingDayTickerMini[]>(async (resolve, reject) =>{
             try {
-                const data = await this.client.getRollingWindowTicker({symbol:coin_symbol, windowSize: windowSize + 'h', type:'FULL'});
+                const data = await this.client!.getRollingWindowTicker({symbol:coin_symbol, windowSize: windowSize + 'h', type:'FULL'});
                 // logger.error(`getRollingWindowTicker:\n${data}\n${JSON.stringify(data)}`);
                 resolve(data);
             } catch (error) {
@@ -114,7 +112,7 @@ export class BinanceService extends Service {
                 if(!coin_symbol.includes('USDT')){
                     coin_symbol = coin_symbol.toUpperCase().concat('USDT');
                 }
-                const price = await this.client.get24hrChangeStatistics({symbol: coin_symbol, type: 'FULL'});
+                const price = await this.client!.get24hrChangeStatistics({symbol: coin_symbol, type: 'FULL'});
                 resolve(price);
             } catch (error) {
                 reject(error)

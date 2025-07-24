@@ -32,33 +32,33 @@ export const processRelect: Action = {
         _responses: Memory[]
     ): Promise<void> => {
         try {
-            const service = runtime.getService(ApiService.serviceType) as ApiService;
-            if(service.is_action_executing!['PROCESS_REFLECT']){
+            const apiService = runtime.getService(ApiService.serviceType) as ApiService;
+            if(apiService.is_action_executing!['PROCESS_REFLECT']){
                 logger.error('***** ACTION PROCESS_REFLECT IS RUNNING, SKIP ACTION  ***** \n');
                 return;
             }
-            service.is_action_executing!['PROCESS_REFLECT'] = true;
+            apiService.is_action_executing!['PROCESS_REFLECT'] = true;
             logger.error(`[CRYPTOTRADE] PROCESS_REFLECT START\n`);
-            let tmp = await service.getPromptOfReflectHistory('BTC');
+            let tmp = await apiService.getPromptOfReflectHistory('BTC');
             const prompt = composePromptFromState({
                 state,
                 template:tmp
             });
-            let resp = await service.tryToCallLLMsWithoutFormat(prompt);
-            if(callback && service.CRYPT_CALLBACK_IN_ACTIONS){
+            let resp = await apiService.tryToCallLLMsWithoutFormat(prompt);
+            if(callback && apiService.CRYPT_CALLBACK_IN_ACTIONS){
                 callback({
                     thought:``,
                     text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
                 });
             }
-            service.step_data!['ANALYSIS_REPORT_REFLECT'] = resp;
-            service.step_state!['PROCESS_REFLET'] = 'DONE';
+            apiService.step_data!['ANALYSIS_REPORT_REFLECT'] = resp;
+            apiService.step_state!['PROCESS_REFLET'] = 'DONE';
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
             message.id = asUUID(v4());
             runtime.emitEvent(EventType.MESSAGE_SENT, {runtime: runtime, message:message, source: 'CryptoTrade_Action_PROCESS_REFLET'});
             logger.warn('***** ACTION PROCESS_REFLET DONE *****');
-            service.is_action_executing!['PROCESS_REFLECT'] = false;
+            apiService.is_action_executing!['PROCESS_REFLECT'] = false;
             return;
         } catch (error) {
             logger.error("Error in reflect action:", error);

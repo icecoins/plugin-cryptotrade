@@ -115,8 +115,8 @@ export class ApiService extends Service {
 
   public dumpRecordPath:string|undefined;
 
-  private priceService:PrinceAnalyzeService;
-  private newsService:LocalNewsAnalyseService;
+  private priceService:PrinceAnalyzeService|undefined;
+  private newsService:LocalNewsAnalyseService|undefined;
   
   public priceDataSource:PriceDataSource = 'Local';
   public newsDataSource:NewsDataSource = 'Local';
@@ -173,10 +173,10 @@ export class ApiService extends Service {
     // project parms should be initialized as soon as the data is loaded
     if(!this.today_idx || !this.end_day_idx){
       if(this.CRYPT_CUSTOM_DATE_INTERVAL){
-            this.today_idx = this.priceService.price_data.length - 2;
-            this.end_day_idx = this.priceService.price_data.length;
-            this.start_day = this.priceService.price_data[this.today_idx].key;
-            this.end_day = this.priceService.price_data[this.end_day_idx].key;
+            this.today_idx = this.priceService!.price_data.length - 2;
+            this.end_day_idx = this.priceService!.price_data.length;
+            this.start_day = this.priceService!.price_data[this.today_idx].key;
+            this.end_day = this.priceService!.price_data[this.end_day_idx].key;
       }else{
           if(this.CRYPT_STAGE){
               switch(this.CRYPT_STAGE){
@@ -197,11 +197,11 @@ export class ApiService extends Service {
               this.start_day = starting_date;
               this.end_day = ending_date;
           }
-          this.today_idx = this.priceService.price_data.findIndex(d => d.key === this.start_day);
-          this.end_day_idx = this.priceService.price_data.findIndex(d => d.key === this.end_day);
+          this.today_idx = this.priceService!.price_data.findIndex(d => d.key === this.start_day);
+          this.end_day_idx = this.priceService!.price_data.findIndex(d => d.key === this.end_day);
       }
     } 
-    this.starting_price = this.priceService.price_data[this.today_idx].value['open'];
+    this.starting_price = this.priceService!.price_data[this.today_idx].value['open'];
     this.starting_net_worth = STARTING_NET_WORTH;
     this.cash = this.starting_net_worth * STARTING_CASH_RATIO;
     this.coin_held = (this.starting_net_worth - this.cash) / this.starting_price!;
@@ -281,14 +281,14 @@ export class ApiService extends Service {
         let resp = 'Error';
         switch(this.priceDataSource){
           case "Local":
-            resp = await this.priceService.loadPriceDataFromFile();
+            resp = await this.priceService!.loadPriceDataFromFile();
             break;
           case "Binance":
-            await this.priceService.initOnChainDataFromBinance('daily', 'BTCUSDT', '1h', false);
-            resp = await this.priceService.retrieveOnChainDataFromBinance('BTCUSDT', '1h', true);
+            await this.priceService!.initOnChainDataFromBinance('daily', 'BTCUSDT', '1h', false);
+            resp = await this.priceService!.retrieveOnChainDataFromBinance('BTCUSDT', '1h', true);
             break;
           case "CoinBase":
-            throw new Error(`loadPriceData from CoinBase has not implement yet.`);
+            throw new Error(`loadPriceData from CoinBase not implemented.`);
             break;
         }
         resolve(resp);
@@ -305,13 +305,13 @@ export class ApiService extends Service {
         let resp = 'Error';
         switch(this.priceDataSource){
           case "Local":
-            resp = await this.priceService.loadTransactionData();
+            resp = await this.priceService!.loadTransactionData();
             break;
           case "Binance":
-            throw new Error(`loadTransactionData from Binance has not implement yet.`);
+            throw new Error(`loadTransactionData from Binance not implemented.`);
             break;
           case "CoinBase":
-            throw new Error(`loadTransactionData from CoinBase has not implement yet.`);
+            throw new Error(`loadTransactionData from CoinBase not implemented.`);
             break;
         }
         resolve(resp);
@@ -328,13 +328,13 @@ export class ApiService extends Service {
         let resp = 'Error';
         switch(this.newsDataSource){
           case "Local":
-            resp = await this.newsService.loadNewsDataFromFile();
+            resp = await this.newsService!.loadNewsDataFromFile();
             break;
           case "CryptoNews":
-            throw new Error(`loadNewsData from CryptoNews has not implement yet.`);
+            throw new Error(`loadNewsData from CryptoNews not implemented.`);
             break;
           case "Reddit":
-            throw new Error(`loadNewsData from Reddit has not implement yet.`);
+            throw new Error(`loadNewsData from Reddit not implemented.`);
             break;
         }
         resolve(resp);
@@ -370,7 +370,7 @@ export class ApiService extends Service {
   }
 
   public getTodayOpenPrice(){
-    return this.priceService.price_data[this.today_idx].value['open'];
+    return this.priceService!.price_data[this.today_idx].value['open'];
   }
 
   public calculateROI(): Promise<any>{
@@ -446,7 +446,7 @@ export class ApiService extends Service {
       let idx_start = record_len - windowSize < 0 ? 0 : record_len - windowSize;
       for(; idx_start < record_len; idx_start++){
         const data_set = this.record[idx_start];
-        let reflect_data = [];
+        let reflect_data:any = [];
         reflect_data.push({
           Step: data_set['STEP'],
           Date: data_set['DATE'],
@@ -550,6 +550,20 @@ export class ApiService extends Service {
         resolve(parsedJson);
       }
     });
+  }
+
+  public generateActions(args:string[]): string[]{
+    let actions:string[] = [];
+    if(args![1] === '1' || args![1] === 'true'){
+      actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
+      if(this.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
+        actions.push('SUMMARIZE_NEWS');
+      }
+      actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);
+    }else if(args![2] === '1' || args![2] === 'true'){
+      actions = ["CALL_BINANCE_API"];
+    }
+    return actions;
   }
 
 }

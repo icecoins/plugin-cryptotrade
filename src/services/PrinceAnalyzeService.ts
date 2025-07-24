@@ -13,7 +13,7 @@ import { BinanceService } from "./BinanceService";
 
 export class PrinceAnalyzeService extends Service {
   static serviceType = 'PrinceAnalyzeService';
-  apiService:ApiService;
+  private apiService:ApiService;
 
   capabilityDescription =
     'This is PrinceAnalyzeService which is attached to the agent through the cryptotrade plugin.';
@@ -23,7 +23,7 @@ export class PrinceAnalyzeService extends Service {
   }
 
   static async start(runtime: IAgentRuntime) {
-    logger.info(`*** Starting api service -- : ${new Date().toISOString()} ***`);
+    logger.info(`*** Starting PrinceAnalyzeService service -- : ${new Date().toISOString()} ***`);
     const service = new PrinceAnalyzeService(runtime);
     return service;
   }

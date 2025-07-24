@@ -24,12 +24,12 @@ export class LocalNewsAnalyseService extends Service {
     'This is LocalNewsAnalyseService which is attached to the agent through the cryptotrade plugin.';
   constructor(runtime: IAgentRuntime) {
     super(runtime);
-    this.apiService = runtime.getService(ApiService.serviceType) as ApiService;
   }
 
   static async start(runtime: IAgentRuntime) {
-    logger.info(`*** Starting api service -- : ${new Date().toISOString()} ***`);
+    logger.info(`*** Starting LocalNewsAnalyseService service -- : ${new Date().toISOString()} ***`);
     const service = new LocalNewsAnalyseService(runtime);
+    service.apiService = runtime.getService(ApiService.serviceType) as ApiService;
     return service;
   }
 
@@ -47,25 +47,25 @@ export class LocalNewsAnalyseService extends Service {
     logger.info('*** THIRD CHANGE - TESTING FILE WATCHING! ***');
   }
 
-  public apiService:ApiService;
+  private apiService:ApiService|undefined;
   public news_data:RecordNewsData[] = [];
   public news_data_simplified:any[] = [];
   public offChainNewsLoaded = false;
 
   public async loadNewsDataFromReddit(chain:string = 'btc', force:boolean = false){
-    if(this.apiService.newsDataSource != 'Reddit'){
-        throw new Error('Data source should be Reddit, now: ' + this.apiService.newsDataSource);
+    if(this.apiService!.newsDataSource != 'Reddit'){
+        throw new Error('Data source should be Reddit, now: ' + this.apiService!.newsDataSource);
     }
     if(!force && this.offChainNewsLoaded){
         resolve('News Data Has Loaded, SKIP');
     }
-    throw new Error('News from Reddit has not implemented yet.');
+    throw new Error('News from Reddit not implemented.');
   }
 
   public async loadNewsDataFromFile(chain:string = 'btc', force:boolean = false, local: boolean = true): Promise<any> {
     return new Promise<any>(async (resolve, reject) => {
-      if(this.apiService.newsDataSource != 'Local'){
-        reject('Data source should be Local, but now: ' + this.apiService.newsDataSource);
+      if(this.apiService!.newsDataSource != 'Local'){
+        reject('Data source should be Local, but now: ' + this.apiService!.newsDataSource);
       }
       if(!force && this.offChainNewsLoaded){
         resolve('News Data Has Loaded, SKIP');
@@ -78,7 +78,7 @@ export class LocalNewsAnalyseService extends Service {
             fileNames.push(name);
         }
         for (const name of fileNames){
-          let news_str = await this.apiService.readFileByAbsPath(path.join(dir, name));
+          let news_str = await this.apiService!.readFileByAbsPath(path.join(dir, name));
           // news_str = [{id, url, title, content,...}, {}, ...]
           let raw_news_data:DefaultArticle[] = JSON.parse(news_str);
           let format_news_data:DefaultArticle[] = [];
@@ -103,7 +103,7 @@ export class LocalNewsAnalyseService extends Service {
     });
   }
 
-  public async simplifyNewsData(chain: string = 'btc', date:string = this.apiService.step_data!['DATE']){
+  public async simplifyNewsData(chain: string = 'btc', date:string = this.apiService!.step_data!['DATE']){
       /*
       There are 1~5 articles selected everyday,
       build prompt and simplify them with LLM in a loop.
@@ -145,7 +145,7 @@ export class LocalNewsAnalyseService extends Service {
             content:this.news_data[idx_news_set].data[i].content
           });
           simp_s += delim;
-          const resp = await this.apiService.tryToCallLLMsWithoutFormat(simp_s, false, false, /*maxTokens:*/200);
+          const resp = await this.apiService!.tryToCallLLMsWithoutFormat(simp_s, false, false, /*maxTokens:*/200);
           this.news_data[idx_news_set].data[i].content_simplified = resp;
         }
         return 'simplifyNewsData done, data record to this.news_data[idx_news_set]';
@@ -155,16 +155,16 @@ export class LocalNewsAnalyseService extends Service {
     }
   
   public getPromptOfProcessNewsData(chain: string = 'btc', date:string = '2024-09-26', maxArticles:number = 3) :string{
-    if(!this.apiService.CRYPT_ENABLE_NEWS_ANALYZE){
+    if(!this.apiService!.CRYPT_ENABLE_NEWS_ANALYZE){
       return '';
     }
     let idx_news = this.news_data.findIndex(item => item.date === date);
     logger.error('API SERVICE getPromptOfNewsData: [' + idx_news + ']\n');
     if(-1 != idx_news && this.news_data[idx_news].data.length > 0){
       let news_s = '';
-      if(this.apiService.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
+      if(this.apiService!.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
         if(!(this.news_data.length > 0)){
-          throw new Error(`Error: The SIMPLIFIED_NEWS set on ${this.apiService.step_data!['DATE']} is empty.`);
+          throw new Error(`Error: The SIMPLIFIED_NEWS set on ${this.apiService!.step_data!['DATE']} is empty.`);
         }
         news_s = `You are an ${chain.toUpperCase()} cryptocurrency trading analyst. There are some articles about cryptocurrency today, and an analyst has completed the summary. You are required to analyze the following summary of these articles:` + delim;
         for(let i = 0; i < this.news_data[idx_news].data.length; i++){

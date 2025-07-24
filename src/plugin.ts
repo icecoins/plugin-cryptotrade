@@ -30,7 +30,7 @@ const managerMsgHandler = async ({
 }: MessageReceivedHandlerParams): Promise<void> => {
   let _state = await runtime.composeState(message);
   let service = runtime.getService(ApiService.serviceType) as ApiService;
-  let args:string[];
+  let args:string[] = [];
   if(message.content.text){
     args = message.content.text.split(',');
     if(!args || args.length < 3 || !(args[0] === 'crypto' || args[0] === 'cryptotrade')){
@@ -43,16 +43,7 @@ const managerMsgHandler = async ({
   }
   if(!LLM_produce_actions){
     do {
-      let actions:string[] = [];
-      if(args![1] === '1' || args![1] === 'true'){
-        actions = ["GET_PRICE", "GET_NEWS", "PROCESS_PRICE"];
-        if(service.CRYPT_ENABLE_NEWS_SIMPLIFICATION){
-          actions.push('SUMMARIZE_NEWS');
-        }
-        actions = actions.concat(["PROCESS_NEWS", "PROCESS_REFLECT", "MAKE_TRADE"]);
-      }else if(args![2] === '1' || args![2] === 'true'){
-        actions = ["CALL_BINANCE_API"];
-      }
+      const actions = service.generateActions(args);
       const _responseContent = {
           thought: '',
           actions: actions,
