@@ -51,8 +51,7 @@ export const processRelect: Action = {
                     text:`Here is the reponse of Reflect Agent:\n\t\t${resp}`,
                 });
             }
-            apiService.step_data!['ANALYSIS_REPORT_REFLECT'] = resp;
-            apiService.step_state!['PROCESS_REFLET'] = 'DONE';
+            apiService.saveReflectReport(resp);
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_REFLET DONE';
             message.id = asUUID(v4());

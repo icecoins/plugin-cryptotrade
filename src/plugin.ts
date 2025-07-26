@@ -21,6 +21,8 @@ import { LLM_produce_actions, manageTemplate_Intro, manageTemplate_Example, mana
 import { ApiService } from './services/ApiService.ts';
 import { v4 } from 'uuid';
 import { simplifyNewsData } from './actions/Common/ActionSummaryNewsData.ts';
+import { PrinceAnalyzeService } from './services/PrinceAnalyzeService.ts';
+import { LocalNewsAnalyseService } from './services/LocalNewsAnalyseService.ts';
 
 const managerMsgHandler = async ({
   runtime,
@@ -28,47 +30,47 @@ const managerMsgHandler = async ({
   callback,
   onComplete,
 }: MessageReceivedHandlerParams): Promise<void> => {
-  let _state = await runtime.composeState(message);
-  let service = runtime.getService(ApiService.serviceType) as ApiService;
   let args:string[] = [];
+  const apiService = runtime.getService(ApiService.serviceType) as ApiService;
   if(message.content.text){
     args = message.content.text.split(',');
     if(!args || args.length < 3 || !(args[0] === 'crypto' || args[0] === 'cryptotrade')){
-      // cryptotrade, trade, callBinanceAPI
+      // cryptotrade, trade, data_source, callBinanceAPI
       await callback({
-                    text:`Invalid args.\nIf you are trying to use plugin-cryptotrade for ElizaOS, please format your input text as:\n\ncryptotrade,1,0\n\nWhich means use_cryptotrade?, for_trade?, test_call_binance_API?\n`,
+                    text:`Invalid args.\nIf you are trying to use plugin-cryptotrade for ElizaOS, please format your input text as:\n\ncryptotrade,1,1,0\n\nWhich means use_cryptotrade?, for_trade?, data_source?, test_call_binance_API?\n`,
                   });
       return;
     }
   }
   if(!LLM_produce_actions){
-    do {
-      const actions = service.generateActions(args);
-      const _responseContent = {
-          thought: '',
-          actions: actions,
-          text: ''
-      };
-      const _responseMessage = {
-            id: asUUID(v4()),
-            entityId: runtime.agentId,
-            agentId: runtime.agentId,
-            content: _responseContent,
-            roomId: message.roomId,
-            createdAt: Date.now(),
-      };
-      if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
-        _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
-        logger.warn('[Manager Handler] callback');
-        await callback(_responseContent);
-      } else {
-        logger.warn('[Manager Handler] processActions');
-        await runtime.processActions(message, [_responseMessage], _state, callback);
-      }
-      service.today_idx += 1;
-      service.appendRecord();
-    } while (service.today_idx <= service.end_day_idx! && !service.abortAllTasks);
-    logger.warn(`[Manager Handler] END at [${service.today_idx}] , [${service.end_day_idx}]`);
+    // do {
+    //   const actions = service.generateActions(args);
+    //   const _responseContent = {
+    //       thought: '',
+    //       actions: actions,
+    //       text: ''
+    //   };
+    //   const _responseMessage = {
+    //         id: asUUID(v4()),
+    //         entityId: runtime.agentId,
+    //         agentId: runtime.agentId,
+    //         content: _responseContent,
+    //         roomId: message.roomId,
+    //         createdAt: Date.now(),
+    //   };
+    //   if (_responseContent && _responseContent.text && (_responseContent.actions?.length === 0 || 
+    //     _responseContent.actions?.length === 1 && _responseContent.actions[0].toUpperCase() === "REPLY")) {
+    //     logger.warn('[Manager Handler] callback');
+    //     await callback(_responseContent);
+    //   } else {
+    //     logger.warn('[Manager Handler] processActions');
+    //     await runtime.processActions(message, [_responseMessage], _state, callback);
+    //   }
+    //   service.today_idx += 1;
+    //   service.appendRecord();
+    // } while (service.today_idx <= service.end_day_idx! && !service.abortAllTasks);
+    // logger.warn(`[Manager Handler] END at [${service.today_idx}] , [${service.end_day_idx}]`);
+    apiService!.run(args, runtime, message, callback);
     return;
   }
   
@@ -81,7 +83,6 @@ const managerMsgHandler = async ({
     ]);
   }
   let state = await runtime.composeState(message);
-  var apiService = runtime.getService(ApiService.serviceType) as ApiService;
   var userMsgTmp = '';
   var prompt = '';
   // Message from CryptoTrade Actions, take next actions
@@ -225,7 +226,7 @@ export const cryptoPlugin: Plugin = {
       },
     },
   ],
-  services: [ApiService, BinanceService],
+  services: [ApiService, BinanceService, LocalNewsAnalyseService, PrinceAnalyzeService],
   actions: [
     simplifyNewsData,
     getNewsData, 

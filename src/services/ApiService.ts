@@ -1,12 +1,19 @@
 import {
+  asUUID,
+    HandlerCallback,
     type IAgentRuntime,
     logger,
+    Memory,
     ModelType,
-    Service} from "@elizaos/core";
+    Service,
+    State,
+    UUID} from "@elizaos/core";
 import * as fs from 'fs';
 import { bear_ending_date, bear_starting_date, bull_ending_date, bull_starting_date, delim, ending_date, EX_RATE, GAS_FEE, LLM_retry_times, sideways_ending_date, sideways_starting_date, STARTING_CASH_RATIO, starting_date, STARTING_NET_WORTH } from "../const/Const";
 import { PrinceAnalyzeService } from "./PrinceAnalyzeService";
 import { LocalNewsAnalyseService as LocalNewsAnalyseService } from "./LocalNewsAnalyseService";
+import { v4 } from 'uuid';
+import { analyzeAndTradeTask, analyzeAndTradeWorker } from "../tasks/AnalyzeAndTradeTask";
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
@@ -16,6 +23,16 @@ export function sleep(ms: number): Promise<void> {
 
 export type PriceDataSource = 'Local'|'Binance'|'CoinBase';
 export type NewsDataSource = 'Local'|'CryptoNews'|'Reddit';
+
+export type OnChainAnalysisReport = {
+  source:PriceDataSource,
+  report:string,
+}
+
+export type OffChainAnalysisReport = {
+  source:NewsDataSource,
+  report:string,
+}
 
 export class ApiService extends Service {
   static serviceType = 'apiservice';
@@ -31,7 +48,6 @@ export class ApiService extends Service {
     service.initState();
     service.initData();
     service.initConfigs();
-    
     service.priceService = runtime.getService(PrinceAnalyzeService.serviceType) as PrinceAnalyzeService;
     service.newsService = runtime.getService(LocalNewsAnalyseService.serviceType) as LocalNewsAnalyseService;
     return service;
@@ -65,8 +81,8 @@ export class ApiService extends Service {
   public step_data?:{
     STEP:number;
     DATE:string;
-    ANALYSIS_REPORT_ON_CHAIN:string;
-    ANALYSIS_REPORT_NEWS:string;
+    ANALYSIS_REPORT_ON_CHAIN:OnChainAnalysisReport[];
+    ANALYSIS_REPORT_NEWS:OffChainAnalysisReport[];
     ANALYSIS_REPORT_REFLECT:string;
     TRADE_REASON:string;
     TRADE_ACTION:string;
@@ -120,6 +136,9 @@ export class ApiService extends Service {
   
   public priceDataSource:PriceDataSource = 'Local';
   public newsDataSource:NewsDataSource = 'Local';
+
+  
+  private tradeTaskInterval: NodeJS.Timeout | undefined;
   
   initConfigs(){
     if(process.env.CRYPT_STARTING_DAY){
@@ -134,6 +153,7 @@ export class ApiService extends Service {
     if(process.env.CRYPT_CUSTOM_TIME_SLOT){
       if(process.env.CRYPT_CUSTOM_TIME_SLOT === 'true'){
         this.CRYPT_CUSTOM_DATE_INTERVAL = true;
+        this.priceDataSource = 'Binance';
       }else{
         this.CRYPT_CUSTOM_DATE_INTERVAL = false;
       }
@@ -169,9 +189,12 @@ export class ApiService extends Service {
     logger.error(`Config init done:\nthis.CRYPT_STARTING_DAY: ${this.CRYPT_STARTING_DAY}\nthis.CRYPT_STAGE: ${this.CRYPT_STAGE}\nthis.callbackInActions: ${this.CRYPT_CALLBACK_IN_ACTIONS}\nthis.enableNewsSimplification: ${this.CRYPT_ENABLE_NEWS_SIMPLIFICATION}`);
   }
 
-  initProject(){
+  async initProject(){
     // project parms should be initialized as soon as the data is loaded
     if(!this.today_idx || !this.end_day_idx){
+      if(this.priceService.price_data.length === 0){
+        await this.loadPriceData();
+      }
       if(this.CRYPT_CUSTOM_DATE_INTERVAL){
             this.today_idx = this.priceService!.price_data.length - 2;
             this.end_day_idx = this.priceService!.price_data.length;
@@ -239,8 +262,8 @@ export class ApiService extends Service {
     this.step_data = structuredClone({
       STEP: this.step_data?.STEP?this.step_data.STEP + 1 : 0,
       DATE: '',
-      ANALYSIS_REPORT_ON_CHAIN: '',
-      ANALYSIS_REPORT_NEWS: '',
+      ANALYSIS_REPORT_ON_CHAIN: [],
+      ANALYSIS_REPORT_NEWS: [],
       ANALYSIS_REPORT_REFLECT: '',
       TRADE_REASON: '',
       TRADE_ACTION: '',
@@ -249,6 +272,16 @@ export class ApiService extends Service {
       TOTAL_ROI: 0,
       SIMPLIFIED_NEWS: []
     });
+  }
+
+  private async waitForServices(){
+    while(!(this.priceService && this.newsService)){
+        logger.error('Waiting for services...');
+        this.priceService = this.runtime.getService(PrinceAnalyzeService.serviceType) as PrinceAnalyzeService;
+        this.newsService = this.runtime.getService(LocalNewsAnalyseService.serviceType) as LocalNewsAnalyseService;
+        await sleep(100);
+    }
+    logger.error('Services init done');
   }
 
   public stepEnd(){
@@ -285,7 +318,10 @@ export class ApiService extends Service {
             break;
           case "Binance":
             await this.priceService!.initOnChainDataFromBinance('daily', 'BTCUSDT', '1h', false);
-            resp = await this.priceService!.retrieveOnChainDataFromBinance('BTCUSDT', '1h', true);
+            await this.priceService!.retrieveOnChainDataFromBinance('BTCUSDT', '1h', true);
+            
+            // the data has saved to local files
+            await this.priceService!.loadPriceDataFromBinanceFile();
             break;
           case "CoinBase":
             throw new Error(`loadPriceData from CoinBase not implemented.`);
@@ -308,7 +344,7 @@ export class ApiService extends Service {
             resp = await this.priceService!.loadTransactionData();
             break;
           case "Binance":
-            throw new Error(`loadTransactionData from Binance not implemented.`);
+            resp = await this.priceService!.loadTransactionData();
             break;
           case "CoinBase":
             throw new Error(`loadTransactionData from CoinBase not implemented.`);
@@ -466,12 +502,21 @@ export class ApiService extends Service {
   public getPromptOfMakeTrade(chain: string = 'btc'){
     let trade_s = `You are an experienced ${chain.toUpperCase()} cryptocurrency trader and you are trying to maximize your overall profit by trading ${chain.toUpperCase()}. In each day, you will make an action to buy or sell ${chain.toUpperCase()}. You are assisted by a few analysts below and need to decide the final action.`
 
-    trade_s += `\n\nON-CHAIN ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_ON_CHAIN']}${delim}\n`;
+    // ON-CHAIN DATA REPORT
+    for(let i = 0; i < this.step_data!['ANALYSIS_REPORT_ON_CHAIN'].length; i++){
+      trade_s += `\n\nON-CHAIN ANALYST:\n{DATA SOURCE:${this.step_data!['ANALYSIS_REPORT_ON_CHAIN'][i].source},\nREPORT:${delim}${this.step_data!['ANALYSIS_REPORT_ON_CHAIN'][i].report}${delim}}\n`;
+    }
+    // trade_s += `\n\nON-CHAIN ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_ON_CHAIN']}${delim}\n`;
 
+    // OFF-CHAIN DATA REPORT
     if(this.CRYPT_ENABLE_NEWS_ANALYZE){
-      trade_s += `NEWS ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_NEWS']}${delim}\n`;
+      for(let i = 0; i < this.step_data!['ANALYSIS_REPORT_NEWS'].length; i++){
+        trade_s += `NEWS ANALYST REPORT:\n{DATA SOURCE:${this.step_data!['ANALYSIS_REPORT_NEWS'][i].source},\nREPORT:${delim}${this.step_data!['ANALYSIS_REPORT_NEWS'][i].report}${delim}}\n`;
+      }
+      // trade_s += `NEWS ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_NEWS']}${delim}\n`;
     }
 
+    // REFLECTION REPORT
     trade_s += `REFLECTION ANALYST REPORT:${delim}${this.step_data!['ANALYSIS_REPORT_REFLECT']}${delim}\n`;
 
     trade_s += 'Now, start your response with your brief reasoning over the given reports. Then, based on the synthesized reports, conclude a clear market trend, emphasizing long-term strategies over short-term gains. Finally, indicate your trading action as a 1-decimal float in the range of [-1,1], reflecting your confidence in the market trend and your strategic decision to manage risk appropriately.'
@@ -552,6 +597,65 @@ export class ApiService extends Service {
     });
   }
 
+  public saveOnChainReport(repot:string){
+    this.step_data!['ANALYSIS_REPORT_ON_CHAIN'].push({
+        source: this.priceDataSource,
+        report: repot
+    });
+    this.step_state!['PROCESS_PRICE'] = 'DONE';
+  }
+
+  public saveOffChainReport(repot:string){
+    this.step_data!['ANALYSIS_REPORT_NEWS'].push({
+        source: this.newsDataSource,
+        report: repot
+    });
+    this.step_state!['PROCESS_NEWS'] = 'DONE';
+  }
+
+  public saveReflectReport(repot:string){
+    this.step_data!['ANALYSIS_REPORT_REFLECT'] = repot;
+    this.step_state!['PROCESS_REFLET'] = 'DONE';
+  }
+
+  public saveTradeReport(){
+    this.stepEnd();
+    this.step_state!['MAKE_TRADE'] = 'DONE';
+  }
+  
+  public async setTask(worldId: UUID): Promise<void>{
+    return new Promise<void>(async (resolve) => {
+      if(this.tradeTaskInterval){
+        logger.info(`*** tradeTaskInterval has been set, skip ***`);
+        resolve();
+        return;
+      }
+      analyzeAndTradeTask.worldId = worldId;
+      this.runtime.registerTaskWorker(analyzeAndTradeWorker);
+      await this.runtime.createTask(analyzeAndTradeTask);
+          // Check for scheduled tasks every seconds
+      this.tradeTaskInterval = setInterval(async () => {
+        await analyzeAndTradeWorker!.execute(this.runtime, {}, analyzeAndTradeTask);
+      }, 1000);
+      logger.info(`*** Scheduled Task set up at : ${new Date().toISOString()} ***`);
+      resolve();
+    });
+  }
+
+  public async stopTask(): Promise<void>{
+    return new Promise<void>(async (resolve) => {
+      if(!this.tradeTaskInterval){
+        logger.info(`*** tradeTaskInterval does not exist, skip ***`);
+        resolve();
+        return;
+      }
+      clearInterval(this.tradeTaskInterval!);
+      this.tradeTaskInterval = undefined;
+      logger.info(`*** Scheduled Task has been delected at : ${new Date().toISOString()} ***`);
+      resolve();
+    });
+  }
+
   public generateActions(args:string[]): string[]{
     let actions:string[] = [];
     if(args![1] === '1' || args![1] === 'true'){
@@ -564,6 +668,56 @@ export class ApiService extends Service {
       actions = ["CALL_BINANCE_API"];
     }
     return actions;
+  }
+
+  public async generateActionsResponseMessages(args:string[], runtime:IAgentRuntime, message:Memory): Promise<Memory[]>{
+    return new Promise<Memory[]>((resolve) => {
+      const actions = this.generateActions(args);
+      const _responseContent = {
+            thought: '',
+            actions: actions,
+            text: ''
+        };
+      const _responseMessage = {
+              id: asUUID(v4()),
+              entityId: runtime.agentId,
+              agentId: runtime.agentId,
+              content: _responseContent,
+              roomId: message.roomId,
+              createdAt: Date.now(),
+      };
+      const responses:Memory[] = [_responseMessage];
+      resolve(responses);
+    })
+  }
+
+  public async step(args:string[], runtime:IAgentRuntime, message:Memory, callback:HandlerCallback, state:State){
+    return new Promise<void>(async (resolve) => {
+      const responses = await this.generateActionsResponseMessages(args, runtime, message);
+      await runtime.processActions(message, responses, state, callback);
+      resolve();
+    });
+  }
+
+  public async run(args:string[], runtime:IAgentRuntime, message:Memory, callback:HandlerCallback){
+    return new Promise<void>(async (resolve) => {
+      await this.waitForServices();
+      if (!this.project_initialized){
+          await this.initProject();
+      }
+      const state = await runtime.composeState(message);
+      await this.setTask(message!.worldId!);
+      // await this.stopTask();
+      // resolve();
+      // return;
+      do{
+        this.step_data!["DATE"] = this.getTodayString();
+        await this.step(args, runtime, message, callback, state);
+        this.today_idx += 1;
+        this.appendRecord();
+      } while (this.today_idx <= this.end_day_idx! && !this.abortAllTasks);
+      resolve();
+    });
   }
 
 }

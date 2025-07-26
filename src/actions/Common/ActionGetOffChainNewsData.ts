@@ -13,7 +13,6 @@ import {
 // import {CRYPTO_EventType} from '../index.ts'
 import {v4} from 'uuid';
 import { ApiService } from "../../services/ApiService";
-import { LocalNewsAnalyseService } from "../../services/LocalNewsAnalyseService";
 export const getNewsData: Action = {
     name: "GET_NEWS",
     similes: [

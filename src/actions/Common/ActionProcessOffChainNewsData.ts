@@ -56,8 +56,7 @@ export const processNewsData: Action = {
                     text:`Here is the reponse of News Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            apiService.step_data!['ANALYSIS_REPORT_NEWS'] = resp;
-            apiService.step_state!['PROCESS_NEWS'] = 'DONE';
+            apiService.saveOffChainReport(resp);
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_NEWS DONE';
             message.id = asUUID(v4());

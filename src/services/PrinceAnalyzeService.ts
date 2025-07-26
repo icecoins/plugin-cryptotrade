@@ -110,13 +110,11 @@ export class PrinceAnalyzeService extends Service {
     });
   }
 
-
   public async loadTransactionDataFromBinance(local: boolean = true): Promise<string>{
     return new Promise<string>(async (resolve, reject) =>{
       // TODO
     });
   }
-
 
   public async loadTransactionData(local: boolean = true): Promise<string>{
     return new Promise<string>(async (resolve, reject) =>{
@@ -158,6 +156,10 @@ export class PrinceAnalyzeService extends Service {
         prevEwma = currentEwma;
     }
     return result;
+  }
+
+  public async loadPriceDataFromBinanceFile(){
+    throw new Error('Not implemented.');
   }
 
   public async loadPriceDataFromFile(chain:string = 'btc', force:boolean = false, local: boolean = true) : Promise<any>{
@@ -361,9 +363,11 @@ export class PrinceAnalyzeService extends Service {
     // https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2025-06.zip
     // https://data.binance.vision/data/spot/daily/klines/BTCUSDT/15m/BTCUSDT-15m-2025-07-14.zip
     let date = new Date();
-    let stop_today = new Date();
-    stop_today.setDate(stop_today.getDate() - 7);
-    date.setMonth(stop_today.getMonth() - 1);
+    let stop_today = structuredClone(date);
+    stop_today.setDate(stop_today.getDate() - 1);
+    date.setDate(stop_today.getDate() - 7);
+
+    // date.setMonth(stop_today.getMonth() - 1);
     while(date.getTime() != stop_today.getTime()){
       // 2025-07-14
       const reqDate = this.parseDateToString(date, 'day');
@@ -398,9 +402,9 @@ export class PrinceAnalyzeService extends Service {
     }
   }
 
-  public async retrieveOnChainDataFromBinance(coin_symbol = 'BTCUSDT', interval:KlineInterval = '4h', forceDelet:boolean = false){
+  public async retrieveOnChainDataFromBinance(coin_symbol = 'BTCUSDT', interval:KlineInterval = '4h', forceDelete:boolean = false){
     return new Promise<string>(async (resolve, reject) => {
-      if(forceDelet){
+      if(forceDelete){
         fs.rmSync(price_path);
         fs.rmSync(transaction_path);
       }
@@ -418,10 +422,14 @@ export class PrinceAnalyzeService extends Service {
       const file_price = fs.openSync(price_path, "w");
       const file_transaction = fs.openSync(transaction_path, "w");
 
-      let start_time = new Date();
-      start_time.setDate(start_time.getDate() - 1);
+      let start_time = new Date(); // beginning of the date: 20xx-MM-DD:00:00:00:00
+      let end_time = structuredClone(start_time); // current time: 20xx-MM-DD:hh:mm:ss:ms
+      start_time.setHours(0);
+      start_time.setMinutes(0);
+      start_time.setSeconds(0);
+      start_time.setMilliseconds(0);
       try{
-        let klinesData = await binanceService.getTransactionDataWithKlines(coin_symbol, start_time, new Date(), interval);
+        let klinesData = await binanceService.getTransactionDataWithKlines(coin_symbol, start_time, end_time, interval);
         fs.writeSync(file_price, `time,openPrice\n${this.parseDateToString(start_time)},${cTickerData.price}\n`);
         fs.writeSync(file_transaction, `time,CEX,interval,openPrice,closePrice,quoteVolume,transactionCount\n${this.parseDateToString(start_time)},Binance,${interval},NO_DATA,NO_DATA,NO_DATA,NO_DATA\n`);
         for(let i = 0; i < klinesData.length; i++){

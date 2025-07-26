@@ -31,7 +31,7 @@ export class BinanceService extends Service {
         // get the service from the runtime
         const service = runtime.getService(BinanceService.serviceType);
         if (!service) {
-        throw new Error('Starter service not found');
+        throw new Error('BinanceService not found');
         }
         service.stop();
     }

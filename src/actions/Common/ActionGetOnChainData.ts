@@ -79,11 +79,6 @@ export const getOnChainData: Action = {
             if(apiService.CRYPT_ENABLE_TRANSACTION_DATA){
                 await apiService.loadTransactionData();
             }
-            
-            if (!apiService.project_initialized){
-                apiService.initProject();
-            }
-            apiService.step_data!["DATE"] = apiService.getTodayString();
             logger.warn('***** GET_PRICE DATA END ***** \n');
             const resp = `Price and transaction data loaded.\nBTC open price on  ${apiService.getTodayString()} is  ${apiService.getTodayOpenPrice()}`;
             if(callback && apiService.CRYPT_CALLBACK_IN_ACTIONS){

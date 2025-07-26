@@ -60,8 +60,7 @@ export const processPriceData: Action = {
                     text:`Here is the reponse of On-Chain Data Analysis Agent:\n\t\t${resp}`,
                 });
             }
-            apiService.step_data!['ANALYSIS_REPORT_ON_CHAIN'] = resp;
-            apiService.step_state!['PROCESS_PRICE'] = 'DONE';
+            apiService.saveOnChainReport(resp);
             var message: Memory;
             message.content.text = 'CryptoTrade_Action_PROCESS_PRICE DONE';
             message.id = asUUID(v4());
